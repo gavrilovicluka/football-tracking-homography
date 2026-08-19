@@ -1,0 +1,26 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local media and generated results
+downloads/
+outputs/
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Logs and local configuration
+*.log
+.env
+.env.*
+!.env.example
+
+# Tooling and OS files
+.vscode/
+.DS_Store
+Thumbs.db
