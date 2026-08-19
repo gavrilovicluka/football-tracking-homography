@@ -4,3 +4,8 @@ opencv-python
 yt-dlp
 tqdm
 numpy
+transformers
+umap-learn
+scikit-learn
+torch
+Pillow

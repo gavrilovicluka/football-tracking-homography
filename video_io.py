@@ -48,6 +48,8 @@ def download_youtube_clip(
 
 def read_frames(video_path: str | Path) -> Iterator[np.ndarray]:
     """Yields frames (BGR, as OpenCV reads them) one at a time."""
+    # TODO: can be replaced with frame_generator = sv.get_video_frames_generator(SOURCE_VIDEO_PATH)
+    
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise IOError(f"Could not open video: {video_path}")
@@ -62,6 +64,8 @@ def read_frames(video_path: str | Path) -> Iterator[np.ndarray]:
 
 
 def get_video_info(video_path: str | Path) -> dict:
+    # TODO: Can be replaced with sv.VideoInfo.from_video_path(video_path)
+
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise IOError(f"Could not open video: {video_path}")
@@ -82,6 +86,8 @@ class VideoWriter:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        # TODO: consider using sv.VideoWriter instead of this wrapper. Also, sv.VideoSink(target_path, video_info) can be used to write 
+        # frames with the same fps/size as the input video, without needing to pass those parameters explicitly.
         self.writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
 
     def write(self, frame: np.ndarray):

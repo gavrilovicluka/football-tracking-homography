@@ -44,6 +44,7 @@ class PlayerTracker:
             keep_mask.append(sum(self._hit_history[tid]) >= self.min_hits_to_confirm)
         return tracked[np.array(keep_mask)]
 
+    # TODO: without usages yet
     def reset(self):
         """Call between separate clips so track IDs don't carry over."""
         self.tracker.reset()
