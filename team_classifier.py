@@ -31,6 +31,8 @@ SIGLIP_MODEL_NAME = "google/siglip-base-patch16-224"
 
 def extract_crops(frame: np.ndarray, xyxy: np.ndarray) -> List[np.ndarray]:
     """Crops out each box from a frame. xyxy: (N, 4) array of [x1, y1, x2, y2]."""
+
+    # TODO: can be replaced with sv.crop_image(frame, xyxy)
     crops = []
     h, w = frame.shape[:2]
     for x1, y1, x2, y2 in xyxy.astype(int):
@@ -56,14 +58,18 @@ class TeamClassifier:
         # per-track history of predicted team_id, used for majority-vote smoothing
         self._track_history: dict[int, Counter] = defaultdict(Counter)
 
-    def _embed(self, crops: List[np.ndarray]) -> np.ndarray:
+    def _extract_embeddings(self, crops: List[np.ndarray]) -> np.ndarray:
         """crops: list of BGR numpy arrays (as read by OpenCV)."""
+
+        # TODO: can be implemented with batch processing
         images = [Image.fromarray(crop[:, :, ::-1]) for crop in crops]  # BGR -> RGB
         inputs = self.processor(images=images, return_tensors="pt").to(self.device)
         with torch.no_grad():
             outputs = self.embedding_model(**inputs)
         # mean-pool patch embeddings into a single vector per crop
         embeddings = outputs.last_hidden_state.mean(dim=1)
+        print(f"Embeddings shape: {embeddings.shape} for {len(crops)} crops")
+
         return embeddings.cpu().numpy()
 
     def fit(self, sample_crops: List[np.ndarray]):
@@ -72,8 +78,10 @@ class TeamClassifier:
             raise ValueError(
                 f"Need more sample crops to fit {self.n_teams} clusters, got {len(sample_crops)}"
             )
-        embeddings = self._embed(sample_crops)
-        reduced = self.reducer.fit_transform(embeddings)
+        embeddings = self._extract_embeddings(sample_crops)
+        reduced = self.reducer.fit_transform(embeddings)    # Trains UMAP, and after that runs the projection on the input embeddings. The result is a (N, 3) array of reduced embeddings.
+        print(f"Reduced embeddings shape: {reduced.shape} for {len(sample_crops)} crops")
+
         self.cluster_model.fit(reduced)
         self._fitted = True
 
@@ -83,7 +91,7 @@ class TeamClassifier:
             raise RuntimeError("TeamClassifier.fit() must be called before predict()")
         if len(crops) == 0:
             return np.array([], dtype=int)
-        embeddings = self._embed(crops)
+        embeddings = self._extract_embeddings(crops)
         reduced = self.reducer.transform(embeddings)
         return self.cluster_model.predict(reduced)
 

@@ -32,6 +32,8 @@ CLASS_COLORS = sv.ColorPalette.from_hex(["#FFD700", "#00BFFF", "#FF4136", "#B10D
 # team0=red, team1=blue, goalkeeper=yellow, referee=purple, ball=white
 DISPLAY_COLORS = sv.ColorPalette.from_hex(["#FF4136", "#0074D9", "#FFDC00", "#B10DC9", "#FFFFFF"])
 
+PLAYER_CROPS_SAMPLE_COUNT = 30  # number of player crops to sample across the clip to fit team classifier
+
 def get_display_color_index(class_id: int, team_id: int | None) -> int:
     """Maps a detection to a color-palette index: 0/1 for team, else class-based."""
     if class_id == PLAYER_CLASS_ID and team_id is not None:
@@ -63,19 +65,38 @@ def make_labels(detections: sv.Detections, team_ids: np.ndarray | None) -> list[
 #     return labels
 
 # We need to collect a sufficient set of player crops to use to train team classification model
-def collect_fitting_crops(video_path: Path, detector: FootballDetector, n_samples: int = 30) -> list:
+def collect_fitting_crops(
+        video_path: Path, 
+        detector: FootballDetector, 
+        n_samples: int = PLAYER_CROPS_SAMPLE_COUNT
+) -> list:
     """Runs detection (no tracking needed) on evenly-spaced sample frames across
     the clip, collecting player crops to fit the team classifier on."""
     info = get_video_info(video_path)
-    sample_indices = set(np.linspace(0, info["frame_count"] - 1, n_samples, dtype=int))
+    sample_indices = set(
+        np.linspace(
+            0, 
+            info["frame_count"] - 1, 
+            n_samples, 
+            dtype=int
+        )
+    )
+
+    frame_generator = sv.get_video_frames_generator(
+        source_path=video_path
+    )
 
     crops = []
-    for i, frame in enumerate(read_frames(video_path)):
+    # for i, frame in enumerate(read_frames(video_path)):
+    for i, frame in enumerate(tqdm(frame_generator, desc="Collecting player crops")):
         if i not in sample_indices:
             continue
         detections = detector.detect(frame)
-        player_mask = detections.class_id == PLAYER_CLASS_ID
-        crops.extend(extract_crops(frame, detections.xyxy[player_mask]))
+        detections = detections[
+            detections.class_id == PLAYER_CLASS_ID
+        ]
+        players_crops = [sv.crop_image(frame, xyxy) for xyxy in detections.xyxy]
+        crops += players_crops
 
     return crops
 
@@ -88,7 +109,7 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
     
     print("Fitting team classifier on sample frames...")
     team_classifier = TeamClassifier(device=device)
-    fitting_crops = collect_fitting_crops(video_path, detector, n_samples=30)
+    fitting_crops = collect_fitting_crops(video_path, detector, n_samples=PLAYER_CROPS_SAMPLE_COUNT)
     team_classifier.fit(fitting_crops)
     print(f"Fitted on {len(fitting_crops)} player crops.")
 
