@@ -24,7 +24,6 @@ from detector import FootballDetector, CLASS_NAMES
 from tracker import PlayerTracker
 from video_io import download_youtube_clip, read_frames, get_video_info, VideoWriter
 from team_classifier import TeamClassifier, PLAYER_CLASS_ID, extract_crops
-from pitch_keypoint_detector import PitchKeypointDetector
 from pitch_landmark_detector import PitchLandmarkDetector
 
 WEIGHTS_PATH = "models/football_players_yolo11s_best.pt"
@@ -178,91 +177,6 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
         "count usually means frequent ID switches from occlusions/re-entries.)"
     )
 
-def test_video_keypoints(
-    video_path: Path,
-    weights_path,
-    num_frames: int = 6,
-    device: str = "cuda:0",
-):
-    cap = cv2.VideoCapture(str(video_path))
-
-    if not cap.isOpened():
-        raise RuntimeError(f"Could not open video: {video_path}")
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-
-    if total_frames <= 0:
-        cap.release()
-        raise RuntimeError("Could not determine video frame count")
-
-    # Pick frames evenly throughout the video
-    frame_indices = np.linspace(
-        0,
-        total_frames - 1,
-        num_frames,
-        dtype=int,
-    )
-
-    pitch_detector = PitchKeypointDetector(
-        weights_path=weights_path,
-        conf=0.5,
-        imgsz=960,
-        device=device,
-    )
-
-    vertex_annotator = sv.VertexAnnotator(
-        color=sv.Color.from_hex("#FF1493"),
-        radius=8,
-    )
-
-    results = []
-
-    for frame_idx in frame_indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_idx))
-
-        ret, frame = cap.read()
-
-        if not ret:
-            print(f"Could not read frame {frame_idx}")
-            continue
-
-        keypoints_xy, keypoints_conf = pitch_detector.detect_filtered(frame)
-
-        key_points = sv.KeyPoints(
-            xy=keypoints_xy[np.newaxis, ...],
-            confidence=keypoints_conf[np.newaxis, ...],
-        )
-
-        annotated_frame = vertex_annotator.annotate(
-            scene=frame.copy(),
-            key_points=key_points,
-        )
-
-        results.append(
-            {
-                "frame_idx": int(frame_idx),
-                "time_sec": frame_idx / fps,
-                "frame": annotated_frame,
-                "keypoints_xy": keypoints_xy,
-                "keypoints_conf": keypoints_conf,
-            }
-        )
-
-    cap.release()
-
-    # Display
-    for result in results:
-        print(
-            f"Frame {result['frame_idx']} "
-            f"({result['time_sec']:.2f}s)"
-        )
-
-        sv.plot_image(result["frame"])
-
-    return results
-
-
 def test_video_landmark_keypoints(
     video_path: Path,
     weights_path,
@@ -369,12 +283,7 @@ def main():
         raise ValueError("Provide either --youtube-url or --video-path")
 
     # process_video(video_path, Path(args.output), conf=args.conf, device=args.device)
-    # test_video_keypoints(
-    #     video_path,
-    #     weights_path=PITCH_KEYPOINT_WEIGHTS_PATH,
-    #     num_frames=6,
-    #     device=args.device,
-    # )
+
     test_video_landmark_keypoints(
         video_path,
         weights_path="models/pitch_landmarks_yolo11n_best.pt",

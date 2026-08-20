@@ -21,7 +21,14 @@ class PitchLandmarkDetector:
         self,
         frame: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Returns (keypoints_xy, landmark_indices, keypoints_conf):
+            keypoints_xy:   (K, 2) pixel coordinates, one row per pitch landmark
+            landmark_indices: (K,) landmark class IDs, used to match each detected point with its corresponding real pitch coordinate for homography
+            keypoints_conf: (K,)   confidence per landmark
 
+        If no pitch instance is detected in the frame, returns empty arrays.
+        """
         result = self.model.predict(
             source=frame,
             conf=self.conf,
