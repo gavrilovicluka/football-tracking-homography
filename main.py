@@ -26,6 +26,10 @@ from video_io import download_youtube_clip, read_frames, get_video_info, VideoWr
 from team_classifier import TeamClassifier, PLAYER_CLASS_ID, extract_crops
 from pitch_landmark_detector import PitchLandmarkDetector
 
+from sports.configs.soccer import SoccerPitchConfiguration
+from sports.annotators.soccer import draw_pitch, draw_points_on_pitch
+from sports.common.view import ViewTransformer
+
 WEIGHTS_PATH = "models/football_players_yolo11s_best.pt"
 PITCH_KEYPOINT_WEIGHTS_PATH = "models/pitch_keypoints_yolo11s_best.pt"
 
@@ -224,24 +228,67 @@ def test_video_landmark_keypoints(
             pitch_detector.detect(frame)
         )
 
-        key_points = sv.KeyPoints(
-            xy=keypoints_xy[np.newaxis, ...],
-            keypoint_confidence=confidences[np.newaxis, ...],
-        )
 
-        annotated_frame = vertex_annotator.annotate(
-            scene=frame.copy(),
-            key_points=key_points,
-        )
+        if len(keypoints_xy) >= 4:
 
-        results.append({
-            "frame_idx": int(frame_idx),
-            "time_sec": frame_idx / fps,
-            "frame": annotated_frame,
-            "keypoints_xy": keypoints_xy,
-            "landmark_indices": landmark_indices,
-            "confidences": confidences,
-        })
+            CONFIG = SoccerPitchConfiguration()
+
+            pitch_vertices = np.array(
+                CONFIG.vertices,
+                dtype=np.float32,
+            )
+
+            source_points = keypoints_xy.astype(np.float32)
+
+            target_points = pitch_vertices[
+                landmark_indices
+            ]
+
+            transformer = ViewTransformer(
+                source=source_points,
+                target=target_points,
+            )
+
+            projected_points = transformer.transform_points(
+                source_points
+            )
+
+            pitch = draw_pitch(CONFIG)
+
+            pitch = draw_points_on_pitch(
+                config=CONFIG,
+                xy=projected_points,
+                face_color=sv.Color.RED,
+                pitch=pitch,
+            )
+            results.append({
+                        "frame_idx": int(frame_idx),
+                        "time_sec": frame_idx / fps,
+                        "frame": pitch,
+                        "keypoints_xy": keypoints_xy,
+                        "landmark_indices": landmark_indices,
+                        "confidences": confidences,
+                    })
+
+
+        # key_points = sv.KeyPoints(
+        #     xy=keypoints_xy[np.newaxis, ...],
+        #     keypoint_confidence=confidences[np.newaxis, ...],
+        # )
+
+        # annotated_frame = vertex_annotator.annotate(
+        #     scene=frame.copy(),
+        #     key_points=key_points,
+        # )
+
+        # results.append({
+        #     "frame_idx": int(frame_idx),
+        #     "time_sec": frame_idx / fps,
+        #     "frame": annotated_frame,
+        #     "keypoints_xy": keypoints_xy,
+        #     "landmark_indices": landmark_indices,
+        #     "confidences": confidences,
+        # })
 
     cap.release()
 
