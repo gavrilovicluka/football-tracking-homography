@@ -49,3 +49,15 @@ DISPLAY_COLOR_INDEX = {
     GOALKEEPER_CLASS_ID: 2,
     REFEREE_CLASS_ID: 3,
 }
+
+# MultiViewPlayer
+TILE_ORDER = ["original", "annotated", "keypoints", "projection"]
+TILE_TITLES = {
+    "original": "Original",
+    "annotated": "Player Detections",
+    "keypoints": "Pitch Keypoints",
+    "projection": "2D Projection",
+}
+CONTROL_BAR_HEIGHT = 40
+BUTTON_WIDTH = 40
+LABEL_HEIGHT = 24

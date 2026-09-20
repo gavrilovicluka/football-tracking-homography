@@ -1,3 +1,13 @@
+## Run full pipeline with interactive window and save videos in \outputs
+```bash
+python main.py --video-path downloads/clip.mp4 --interactive
+```
+
+## Run interactive window with generated outputs
+```bash
+python view_existing_outputs.py
+```
+
 ## Visualization / Debugging
 Visualize detected pitch landmarks:
 

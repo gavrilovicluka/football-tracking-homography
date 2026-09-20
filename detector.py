@@ -9,6 +9,7 @@ import numpy as np
 import supervision as sv
 from ultralytics import YOLO
 
+from config import IMAGE_SIZE
 from constants import DEFAULT_CLASS_CONF_THRESHOLDS
 
 class FootballDetector:
@@ -16,7 +17,7 @@ class FootballDetector:
         self,
         weights_path: str | Path,
         conf: float = 0.10,
-        imgsz: int = 1280,
+        imgsz: int = IMAGE_SIZE,
         device: str = "cpu",
         class_conf_thresholds: dict | None = None,
     ):

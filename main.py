@@ -22,6 +22,7 @@ Usage:
 """
 import argparse
 from pathlib import Path
+from time import perf_counter
 import traceback
 import numpy as np
 
@@ -29,9 +30,11 @@ import supervision as sv
 from tqdm import tqdm
 
 from app_ui import ApplicationUI
-from config import PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
+from config import CLASSIFICATION_INTERVAL, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
 from constants import CLASS_NAMES, DISPLAY_COLOR_INDEX, DISPLAY_COLORS, PLAYER_CLASS_ID
 from detector import FootballDetector
+from interactive_viewer import MultiViewPlayer
+from multiview_pipeline import process_video_multiview
 from tracker import PlayerTracker
 from utils import collect_fitting_crops
 from video_io import download_youtube_clip, read_frames, get_video_info, VideoWriter
@@ -87,6 +90,12 @@ def parse_arguments():
         help="'cpu', '0' for GPU 0, etc.",
     )
 
+    parser.add_argument(
+        "--interactive", 
+        action="store_true",
+        help="Process the full video and open the 4-panel review window"
+    )
+
     return parser.parse_args()
 
 def get_display_color_index(class_id: int, team_id: int | None) -> int:
@@ -129,7 +138,11 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
     tracker = PlayerTracker(frame_rate=max(1, round(info["fps"])))
     
     print("Fitting team classifier on sample frames...")
-    team_classifier = TeamClassifier(device=device)
+    team_classifier = TeamClassifier(
+        device=device,
+        n_teams=2,
+        classification_interval=CLASSIFICATION_INTERVAL
+    )
     fitting_crops = collect_fitting_crops(video_path, detector, n_samples=PLAYER_CROPS_SAMPLE_COUNT)
     team_classifier.fit(fitting_crops)
     print(f"Fitted on {len(fitting_crops)} player crops.")
@@ -141,9 +154,22 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
     unique_ids = set()
 
     try:
+        detection_time = 0.0
+        tracking_time = 0.0
+        classification_time = 0.0
+        annotation_time = 0.0
         for frame in tqdm(read_frames(video_path), total=info["frame_count"], desc="Processing"):
+            start = perf_counter()
+
             detections = detector.detect(frame)
+
+            detection_time += perf_counter() - start
+
+            start = perf_counter()
+    
             detections = tracker.update(detections)
+
+            tracking_time += perf_counter() - start
 
             if detections.tracker_id is not None:
                 unique_ids.update(detections.tracker_id.tolist())
@@ -152,14 +178,24 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
             team_ids_full = np.full(len(detections), -1, dtype=int)
             player_mask = detections.class_id == PLAYER_CLASS_ID
 
+            start = perf_counter()
+
             if player_mask.any():
                 player_crops = extract_crops(frame, detections.xyxy[player_mask])
-                raw_preds = team_classifier.predict(player_crops)
-                stable_preds = team_classifier.assign_team_ids(
-                    detections.tracker_id[player_mask], raw_preds
+                # raw_preds = team_classifier.predict(player_crops)
+                # stable_preds = team_classifier.assign_team_ids(
+                #     detections.tracker_id[player_mask], raw_preds
+                # )
+                stable_preds = team_classifier.predict_tracked(
+                    player_crops,
+                    detections.tracker_id[player_mask]
                 )
                 team_ids_full[player_mask] = stable_preds
 
+            classification_time += (
+                perf_counter() - start
+            )
+            
             labels = make_labels(detections, team_ids_full)
 
             color_indices = np.array([
@@ -178,11 +214,17 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
                 tracker_id=detections.tracker_id.copy() if detections.tracker_id is not None else None,
             )
 
+            start = perf_counter()
+
             annotated_frame = frame.copy()
             annotated_frame = box_annotator.annotate(scene=annotated_frame, detections=display_detections)
             annotated_frame = label_annotator.annotate(scene=annotated_frame, detections=display_detections, labels=labels)
 
             writer.write(annotated_frame)
+
+            annotation_time += (
+                perf_counter() - start
+            )
     finally:
         writer.release()
 
@@ -192,6 +234,20 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
         "(Rough sanity check, not a formal metric: expect somewhere around "
         "22 players + ref(s) + ball if tracking stays stable. A much higher "
         "count usually means frequent ID switches from occlusions/re-entries.)"
+    )
+
+    print("\nTiming summary:")
+    print(
+        f"Detection:       {detection_time:.2f}s"
+    )
+    print(
+        f"Tracking:        {tracking_time:.2f}s"
+    )
+    print(
+        f"Classification:  {classification_time:.2f}s"
+    )
+    print(
+        f"Annotation/write:{annotation_time:.2f}s"
     )
 
 
@@ -214,12 +270,17 @@ def run_from_cli(args):
             duration=args.duration,
         )
 
-    process_video(
-        video_path=video_path,
-        output_path=args.output,
-        conf=args.conf,
-        device=args.device,
-    )
+    if args.interactive:
+        paths = process_video_multiview(video_path=video_path, output_dir=args.output.parent, device=args.device)
+        MultiViewPlayer(paths).run()
+    else:
+        process_video(video_path=video_path, output_path=args.output, conf=args.conf, device=args.device)
+    # process_video(
+    #     video_path=video_path,
+    #     output_path=args.output,
+    #     conf=args.conf,
+    #     device=args.device,
+    # )
 
 
 def run_from_ui():
