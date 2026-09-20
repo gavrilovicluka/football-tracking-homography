@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import numpy as np
 
 from config import PLAYER_CROPS_SAMPLE_COUNT
@@ -46,3 +47,12 @@ def collect_fitting_crops(
         crops += players_crops
 
     return crops
+
+def is_valid_time(value: str) -> bool:
+    if not value:
+        return True
+
+    return re.fullmatch(
+        r"\d{2}:\d{2}:\d{2}",
+        value,
+    ) is not None

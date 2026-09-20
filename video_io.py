@@ -31,6 +31,7 @@ def download_youtube_clip(
         "outtmpl": str(output_path),
         "merge_output_format": "mp4",
         "noplaylist": True,
+        "color": "no_color",
         # "extractor_args": {"youtube": {"player_client": ["web"]}},
     }
 
