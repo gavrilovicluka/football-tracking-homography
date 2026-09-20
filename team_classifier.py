@@ -23,11 +23,7 @@ from transformers import SiglipVisionModel, SiglipImageProcessor
 from sklearn.cluster import KMeans
 import umap
 
-# Must match CLASS_NAMES order in detector.py: ["ball", "goalkeeper", "player", "referee"]
-PLAYER_CLASS_ID = 2
-
-SIGLIP_MODEL_NAME = "google/siglip-base-patch16-224"
-
+from config import SIGLIP_MODEL_NAME
 
 def extract_crops(frame: np.ndarray, xyxy: np.ndarray) -> List[np.ndarray]:
     """Crops out each box from a frame. xyxy: (N, 4) array of [x1, y1, x2, y2]."""

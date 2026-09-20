@@ -9,15 +9,7 @@ import numpy as np
 import supervision as sv
 from ultralytics import YOLO
 
-# Must match the class order from data.yaml used during training
-CLASS_NAMES = ["ball", "goalkeeper", "player", "referee"]
-
-DEFAULT_CLASS_CONF_THRESHOLDS = {
-    0: 0.15,   # ball - recall was the weak point (0.556), so keep this low
-    1: 0.35,   # goalkeeper
-    2: 0.35,   # player
-    3: 0.45,   # referee - raise this to cut false positives from kit-color confusion
-}
+from constants import DEFAULT_CLASS_CONF_THRESHOLDS
 
 class FootballDetector:
     def __init__(

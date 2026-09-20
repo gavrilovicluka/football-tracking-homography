@@ -1,6 +1,12 @@
 """
-End-to-end: (optionally download a YouTube clip) -> detect (YOLOv11)
--> track (ByteTrack) -> annotate -> save output video.
+End-to-end football player analysis pipeline:
+
+video
+-> player detection
+-> multi-object tracking
+-> team classification
+-> annotation
+-> output video
 
 Usage:
     python main.py --youtube-url "https://youtube.com/watch?v=XXXXXXXX" --start 00:01:30 --duration 15
@@ -16,40 +22,48 @@ import argparse
 from pathlib import Path
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 import supervision as sv
 from tqdm import tqdm
 
-from detector import FootballDetector, CLASS_NAMES
+from config import PITCH_KEYPOINT_WEIGHTS_PATH, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
+from constants import CLASS_COLORS, CLASS_NAMES, DISPLAY_COLOR_INDEX, DISPLAY_COLORS, PLAYER_CLASS_ID
+from detector import FootballDetector
+from pitch_projection import PitchProjector
+from scripts.visualize_pitch_landmarks import visualize_pitch_landmarks
+from scripts.visualize_player_projection import visualize_player_projection
 from tracker import PlayerTracker
+from utils import collect_fitting_crops
 from video_io import download_youtube_clip, read_frames, get_video_info, VideoWriter
-from team_classifier import TeamClassifier, PLAYER_CLASS_ID, extract_crops
+from team_classifier import TeamClassifier, extract_crops
 from pitch_landmark_detector import PitchLandmarkDetector
 
 from sports.configs.soccer import SoccerPitchConfiguration
 from sports.annotators.soccer import draw_pitch, draw_points_on_pitch
 from sports.common.view import ViewTransformer
 
-WEIGHTS_PATH = "models/football_players_yolo11s_best.pt"
-PITCH_KEYPOINT_WEIGHTS_PATH = "models/pitch_keypoints_yolo11s_best.pt"
-
-# ball=gold, goalkeeper=blue, player=red, referee=purple - matches CLASS_NAMES order
-CLASS_COLORS = sv.ColorPalette.from_hex(["#FFD700", "#00BFFF", "#FF4136", "#B10DC9"])
-
-# team0=red, team1=blue, goalkeeper=yellow, referee=purple, ball=white
-DISPLAY_COLORS = sv.ColorPalette.from_hex(["#FF4136", "#0074D9", "#FFDC00", "#B10DC9", "#FFFFFF"])
-
-PLAYER_CROPS_SAMPLE_COUNT = 30  # number of player crops to sample across the clip to fit team classifier
-
 def get_display_color_index(class_id: int, team_id: int | None) -> int:
-    """Maps a detection to a color-palette index: 0/1 for team, else class-based."""
+    """
+    Maps a detection to a color-palette index: 0/1 for team, else class-based.
+    """
     if class_id == PLAYER_CLASS_ID and team_id is not None:
         return team_id  # 0 or 1
-    return {0: 4, 1: 2, 3: 3}[class_id]  # ball, goalkeeper, referee
+    
+    return DISPLAY_COLOR_INDEX[class_id]  # ball, goalkeeper, referee
 
 def build_annotators():
-    box_annotator = sv.BoxAnnotator(color=CLASS_COLORS, thickness=2)
-    label_annotator = sv.LabelAnnotator(color=CLASS_COLORS, text_scale=0.5, text_thickness=1)
+    box_annotator = sv.BoxAnnotator(
+        color=DISPLAY_COLORS, 
+        thickness=2
+    )
+
+    label_annotator = sv.LabelAnnotator(
+        color=DISPLAY_COLORS,
+        text_scale=0.5,
+        text_thickness=1,
+    )
+
     return box_annotator, label_annotator
 
 def make_labels(detections: sv.Detections, team_ids: np.ndarray | None) -> list[str]:
@@ -60,52 +74,6 @@ def make_labels(detections: sv.Detections, team_ids: np.ndarray | None) -> list[
         team_tag = f" T{team_ids[i]}" if (class_id == PLAYER_CLASS_ID and team_ids is not None) else ""
         labels.append(f"{name}{team_tag} {tid}")
     return labels
-
-# def make_labels(detections: sv.Detections) -> list[str]:
-#     labels = []
-#     for class_id, tracker_id, conf in zip(
-#         detections.class_id, detections.tracker_id, detections.confidence
-#     ):
-#         name = CLASS_NAMES[class_id]
-#         tid = f"#{tracker_id}" if tracker_id is not None else ""
-#         labels.append(f"{name} {tid} {conf:.2f}")
-#     return labels
-
-# We need to collect a sufficient set of player crops to use to train team classification model
-def collect_fitting_crops(
-        video_path: Path, 
-        detector: FootballDetector, 
-        n_samples: int = PLAYER_CROPS_SAMPLE_COUNT
-) -> list:
-    """Runs detection (no tracking needed) on evenly-spaced sample frames across
-    the clip, collecting player crops to fit the team classifier on."""
-    info = get_video_info(video_path)
-    sample_indices = set(
-        np.linspace(
-            0, 
-            info["frame_count"] - 1, 
-            n_samples, 
-            dtype=int
-        )
-    )
-
-    frame_generator = sv.get_video_frames_generator(
-        source_path=video_path
-    )
-
-    crops = []
-    # for i, frame in enumerate(read_frames(video_path)):
-    for i, frame in enumerate(tqdm(frame_generator, desc="Collecting player crops")):
-        if i not in sample_indices:
-            continue
-        detections = detector.detect(frame)
-        detections = detections[
-            detections.class_id == PLAYER_CLASS_ID
-        ]
-        players_crops = [sv.crop_image(frame, xyxy) for xyxy in detections.xyxy]
-        crops += players_crops
-
-    return crops
 
 def process_video(video_path: Path, output_path: Path, conf: float = 0.25, device: str = "cpu"):
     info = get_video_info(video_path)
@@ -120,9 +88,8 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
     team_classifier.fit(fitting_crops)
     print(f"Fitted on {len(fitting_crops)} player crops.")
 
-    # box_annotator, label_annotator = build_annotators()
-    box_annotator = sv.BoxAnnotator(color=DISPLAY_COLORS, thickness=2)
-    label_annotator = sv.LabelAnnotator(color=DISPLAY_COLORS, text_scale=0.5, text_thickness=1)
+    box_annotator, label_annotator = build_annotators()
+
     writer = VideoWriter(output_path, fps=info["fps"], width=info["width"], height=info["height"])
 
     unique_ids = set()
@@ -181,162 +148,43 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
         "count usually means frequent ID switches from occlusions/re-entries.)"
     )
 
-def test_video_landmark_keypoints(
-    video_path: Path,
-    weights_path,
-    num_frames: int = 6,
-    device: str = "0",
-):
-    cap = cv2.VideoCapture(str(video_path))
-
-    if not cap.isOpened():
-        raise RuntimeError(f"Could not open video: {video_path}")
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-
-    frame_indices = np.linspace(
-        0,
-        total_frames - 1,
-        num_frames,
-        dtype=int,
-    )
-
-    pitch_detector = PitchLandmarkDetector(
-        weights_path=weights_path,
-        conf=0.5,
-        imgsz=960,
-        device=device,
-    )
-
-    vertex_annotator = sv.VertexAnnotator(
-        color=sv.Color.from_hex("#FF1493"),
-        radius=8,
-    )
-
-    results = []
-
-    for frame_idx in frame_indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_idx))
-
-        ret, frame = cap.read()
-
-        if not ret:
-            continue
-
-        keypoints_xy, landmark_indices, confidences = (
-            pitch_detector.detect(frame)
-        )
-
-
-        if len(keypoints_xy) >= 4:
-
-            CONFIG = SoccerPitchConfiguration()
-
-            pitch_vertices = np.array(
-                CONFIG.vertices,
-                dtype=np.float32,
-            )
-
-            source_points = keypoints_xy.astype(np.float32)
-
-            target_points = pitch_vertices[
-                landmark_indices
-            ]
-
-            transformer = ViewTransformer(
-                source=source_points,
-                target=target_points,
-            )
-
-            projected_points = transformer.transform_points(
-                source_points
-            )
-
-            pitch = draw_pitch(CONFIG)
-
-            pitch = draw_points_on_pitch(
-                config=CONFIG,
-                xy=projected_points,
-                face_color=sv.Color.RED,
-                pitch=pitch,
-            )
-            results.append({
-                        "frame_idx": int(frame_idx),
-                        "time_sec": frame_idx / fps,
-                        "frame": pitch,
-                        "keypoints_xy": keypoints_xy,
-                        "landmark_indices": landmark_indices,
-                        "confidences": confidences,
-                    })
-
-
-        # key_points = sv.KeyPoints(
-        #     xy=keypoints_xy[np.newaxis, ...],
-        #     keypoint_confidence=confidences[np.newaxis, ...],
-        # )
-
-        # annotated_frame = vertex_annotator.annotate(
-        #     scene=frame.copy(),
-        #     key_points=key_points,
-        # )
-
-        # results.append({
-        #     "frame_idx": int(frame_idx),
-        #     "time_sec": frame_idx / fps,
-        #     "frame": annotated_frame,
-        #     "keypoints_xy": keypoints_xy,
-        #     "landmark_indices": landmark_indices,
-        #     "confidences": confidences,
-        # })
-
-    cap.release()
-
-    for result in results:
-        print(
-            f"Frame {result['frame_idx']} "
-            f"({result['time_sec']:.2f}s)"
-        )
-
-        print("Landmarks:", result["landmark_indices"])
-
-        sv.plot_image(result["frame"])
-
-    return results
-
-
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--youtube-url", type=str, default=None)
+
+    source_group = parser.add_mutually_exclusive_group(required=True)
+
+    source_group.add_argument(
+        "--youtube-url",
+        type=str,
+    )
+
+    source_group.add_argument(
+        "--video-path",
+        type=Path,
+        help="Use an already downloaded video.",
+    )
+
+    # parser.add_argument("--youtube-url", type=str, default=None)
     parser.add_argument("--start", type=str, default=None, help="HH:MM:SS clip start (with --youtube-url)")
     parser.add_argument("--duration", type=int, default=15, help="Clip duration in seconds")
-    parser.add_argument("--video-path", type=str, default=None, help="Use an already-downloaded video instead")
-    parser.add_argument("--output", type=str, default="outputs/tracked_output.mp4")
+    # parser.add_argument("--video-path", type=str, default=None, help="Use an already-downloaded video instead")
+    parser.add_argument("--output", type=Path, default=Path("outputs/tracked_output.mp4"))
     parser.add_argument("--conf", type=float, default=0.25)
     parser.add_argument("--device", type=str, default="cpu", help="'cpu', '0' for GPU 0, etc.")
     args = parser.parse_args()
 
     if args.video_path:
-        video_path = Path(args.video_path)
-    elif args.youtube_url:
+        video_path = args.video_path
+    else:
         video_path = download_youtube_clip(
             args.youtube_url,
             output_path="downloads/clip.mp4",
             start_time=args.start,
             duration=args.duration,
         )
-    else:
-        raise ValueError("Provide either --youtube-url or --video-path")
 
-    # process_video(video_path, Path(args.output), conf=args.conf, device=args.device)
-
-    test_video_landmark_keypoints(
-        video_path,
-        weights_path="models/pitch_landmarks_yolo11n_best.pt",
-        num_frames=6,
-        device=args.device,
-    )
+    # process_video(video_path, args.output, conf=args.conf, device=args.device)
 
 
 if __name__ == "__main__":
