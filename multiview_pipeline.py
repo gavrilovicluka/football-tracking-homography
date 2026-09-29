@@ -28,21 +28,19 @@ from config import (
     PLAYER_CROPS_SAMPLE_COUNT,
     WEIGHTS_PATH,
 )
-from constants import (
-    CLASS_NAMES,
+from constants import CLASS_NAMES, PLAYER_CLASS_ID
+from detector import FootballDetector
+from rendering import (
     DISPLAY_COLOR_INDEX,
     DISPLAY_COLORS,
     LABEL_HEIGHT,
-    PLAYER_CLASS_ID,
     TEAM_COLORS,
     TILE_TITLES,
 )
-from detector import FootballDetector
 from tracker import PlayerTracker
-from team_classifier import TeamClassifier, extract_crops
+from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops
 from pitch_landmark_detector import PitchLandmarkDetector
 from pitch_projection import PitchProjector
-from utils import collect_fitting_crops
 from video_io import read_frames, get_video_info, VideoWriter
 
 from sports.annotators.soccer import draw_pitch, draw_points_on_pitch

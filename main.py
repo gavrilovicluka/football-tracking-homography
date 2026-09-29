@@ -31,14 +31,14 @@ from tqdm import tqdm
 
 from app_ui import ApplicationUI
 from config import CLASSIFICATION_INTERVAL, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
-from constants import CLASS_NAMES, DISPLAY_COLOR_INDEX, DISPLAY_COLORS, PLAYER_CLASS_ID
+from constants import CLASS_NAMES, PLAYER_CLASS_ID
 from detector import FootballDetector
 from interactive_viewer import MultiViewPlayer
 from multiview_pipeline import process_video_multiview
+from rendering import DISPLAY_COLOR_INDEX, DISPLAY_COLORS
 from tracker import PlayerTracker
-from utils import collect_fitting_crops
 from video_io import download_youtube_clip, read_frames, get_video_info, VideoWriter
-from team_classifier import TeamClassifier, extract_crops
+from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops
 
 
 def parse_arguments():

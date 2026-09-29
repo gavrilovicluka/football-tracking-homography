@@ -5,14 +5,14 @@ import cv2
 import matplotlib.pyplot as plt
 
 from config import PITCH_KEYPOINT_WEIGHTS_PATH, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
-from constants import PLAYER_CLASS_ID, TEAM_COLORS
-from utils import collect_fitting_crops
+from constants import PLAYER_CLASS_ID
+from rendering import TEAM_COLORS
 
 import supervision as sv
 
 from detector import FootballDetector
 from pitch_projection import PitchProjector
-from team_classifier import TeamClassifier, extract_crops
+from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops
 from pitch_landmark_detector import PitchLandmarkDetector
 
 from sports.annotators.soccer import draw_pitch, draw_points_on_pitch
