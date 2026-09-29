@@ -26,16 +26,15 @@ from time import perf_counter
 import traceback
 import numpy as np
 
-import supervision as sv
 from tqdm import tqdm
 
 from app_ui import ApplicationUI
 from config import CLASSIFICATION_INTERVAL, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
-from constants import CLASS_NAMES, PLAYER_CLASS_ID
+from constants import PLAYER_CLASS_ID
 from detector import FootballDetector
 from interactive_viewer import MultiViewPlayer
 from multiview_pipeline import process_video_multiview
-from rendering import DISPLAY_COLOR_INDEX, DISPLAY_COLORS
+from rendering import annotate_frame, build_annotators
 from tracker import PlayerTracker
 from video_io import download_youtube_clip, read_frames, get_video_info, VideoWriter
 from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops
@@ -98,38 +97,6 @@ def parse_arguments():
 
     return parser.parse_args()
 
-def get_display_color_index(class_id: int, team_id: int | None) -> int:
-    """
-    Maps a detection to a color-palette index: 0/1 for team, else class-based.
-    """
-    if class_id == PLAYER_CLASS_ID and team_id is not None:
-        return team_id  # 0 or 1
-    
-    return DISPLAY_COLOR_INDEX[class_id]  # ball, goalkeeper, referee
-
-def build_annotators():
-    box_annotator = sv.BoxAnnotator(
-        color=DISPLAY_COLORS, 
-        thickness=2
-    )
-
-    label_annotator = sv.LabelAnnotator(
-        color=DISPLAY_COLORS,
-        text_scale=0.5,
-        text_thickness=1,
-    )
-
-    return box_annotator, label_annotator
-
-def make_labels(detections: sv.Detections, team_ids: np.ndarray | None) -> list[str]:
-    labels = []
-    for i, (class_id, tracker_id) in enumerate(zip(detections.class_id, detections.tracker_id)):
-        name = CLASS_NAMES[class_id]
-        tid = f"#{tracker_id}" if tracker_id is not None else ""
-        team_tag = f" T{team_ids[i]}" if (class_id == PLAYER_CLASS_ID and team_ids is not None) else ""
-        labels.append(f"{name}{team_tag} {tid}")
-    return labels
-
 def process_video(video_path: Path, output_path: Path, conf: float = 0.25, device: str = "cpu"):
     info = get_video_info(video_path)
     print(f"Video: {info['width']}x{info['height']} @ {info['fps']:.1f}fps, {info['frame_count']} frames")
@@ -147,7 +114,7 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
     team_classifier.fit(fitting_crops)
     print(f"Fitted on {len(fitting_crops)} player crops.")
 
-    box_annotator, label_annotator = build_annotators()
+    annotators = build_annotators()
 
     writer = VideoWriter(output_path, fps=info["fps"], width=info["width"], height=info["height"])
 
@@ -191,28 +158,10 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
             classification_time += (
                 perf_counter() - start
             )
-            
-            labels = make_labels(detections, team_ids_full)
-
-            color_indices = np.array([
-                get_display_color_index(cid, tid if tid != -1 else None)
-                for cid, tid in zip(detections.class_id, team_ids_full)
-            ])
-            # sv.BoxAnnotator colors by detections.class_id by default - temporarily
-            # substitute so it colors by team/display index instead
-            display_detections = sv.Detections(
-                xyxy=detections.xyxy.copy(),
-                mask=detections.mask.copy() if detections.mask is not None else None,
-                confidence=detections.confidence.copy() if detections.confidence is not None else None,
-                class_id=color_indices,
-                tracker_id=detections.tracker_id.copy() if detections.tracker_id is not None else None,
-            )
 
             start = perf_counter()
 
-            annotated_frame = frame.copy()
-            annotated_frame = box_annotator.annotate(scene=annotated_frame, detections=display_detections)
-            annotated_frame = label_annotator.annotate(scene=annotated_frame, detections=display_detections, labels=labels)
+            annotated_frame = annotate_frame(frame, detections, team_ids_full, annotators)
 
             writer.write(annotated_frame)
 
