@@ -36,17 +36,25 @@ from video_io import get_video_info
 if TYPE_CHECKING:
     from detector import FootballDetector
 
+def valid_box_mask(frame_shape: tuple[int, ...], xyxy: np.ndarray) -> np.ndarray:
+    """True for boxes that still have a positive area after clipping to the frame."""
+    h, w = frame_shape[:2]
+    boxes = xyxy.astype(int)
+    x1, y1 = np.maximum(boxes[:, 0], 0), np.maximum(boxes[:, 1], 0)
+    x2, y2 = np.minimum(boxes[:, 2], w), np.minimum(boxes[:, 3], h)
+    return (x2 > x1) & (y2 > y1)
+
+
 def extract_crops(frame: np.ndarray, xyxy: np.ndarray) -> List[np.ndarray]:
     """Crops out each box from a frame. xyxy: (N, 4) array of [x1, y1, x2, y2]."""
-
     # TODO: can be replaced with sv.crop_image(frame, xyxy)
     crops = []
     h, w = frame.shape[:2]
-    for x1, y1, x2, y2 in xyxy.astype(int):
+    crops = []
+    for x1, y1, x2, y2 in xyxy[valid_box_mask(frame.shape, xyxy)].astype(int):
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(w, x2), min(h, y2)
-        if x2 > x1 and y2 > y1:
-            crops.append(frame[y1:y2, x1:x2])
+        crops.append(frame[y1:y2, x1:x2])
     return crops
 
 

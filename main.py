@@ -1,12 +1,12 @@
 """
-End-to-end football player analysis pipeline:
+Entry point for the football analysis pipelines (see pipelines.py):
 
 video
 -> player detection
 -> multi-object tracking
 -> team classification
--> annotation
--> output video
+-> annotation (+ pitch projection with --interactive)
+-> output video(s)
 
 Usage:
     python main.py
@@ -22,22 +22,12 @@ Usage:
 """
 import argparse
 from pathlib import Path
-from time import perf_counter
 import traceback
-import numpy as np
-
-from tqdm import tqdm
 
 from app_ui import ApplicationUI
-from config import CLASSIFICATION_INTERVAL, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
-from constants import PLAYER_CLASS_ID
-from detector import FootballDetector
 from interactive_viewer import MultiViewPlayer
-from multiview_pipeline import process_video_multiview
-from rendering import annotate_frame, build_annotators
-from tracker import PlayerTracker
-from video_io import download_youtube_clip, read_frames, get_video_info, VideoWriter
-from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops
+from pipelines import process_video, process_video_multiview
+from video_io import download_youtube_clip
 
 
 def parse_arguments():
@@ -96,102 +86,6 @@ def parse_arguments():
     )
 
     return parser.parse_args()
-
-def process_video(video_path: Path, output_path: Path, conf: float = 0.25, device: str = "cpu"):
-    info = get_video_info(video_path)
-    print(f"Video: {info['width']}x{info['height']} @ {info['fps']:.1f}fps, {info['frame_count']} frames")
-
-    detector = FootballDetector(WEIGHTS_PATH, conf=conf, device=device)
-    tracker = PlayerTracker(frame_rate=max(1, round(info["fps"])))
-    
-    print("Fitting team classifier on sample frames...")
-    team_classifier = TeamClassifier(
-        device=device,
-        n_teams=2,
-        classification_interval=CLASSIFICATION_INTERVAL
-    )
-    fitting_crops = collect_fitting_crops(video_path, detector, n_samples=PLAYER_CROPS_SAMPLE_COUNT)
-    team_classifier.fit(fitting_crops)
-    print(f"Fitted on {len(fitting_crops)} player crops.")
-
-    annotators = build_annotators()
-
-    writer = VideoWriter(output_path, fps=info["fps"], width=info["width"], height=info["height"])
-
-    unique_ids = set()
-
-    try:
-        detection_time = 0.0
-        tracking_time = 0.0
-        classification_time = 0.0
-        annotation_time = 0.0
-        for frame in tqdm(read_frames(video_path), total=info["frame_count"], desc="Processing"):
-            start = perf_counter()
-
-            detections = detector.detect(frame)
-
-            detection_time += perf_counter() - start
-
-            start = perf_counter()
-    
-            detections = tracker.update(detections)
-
-            tracking_time += perf_counter() - start
-
-            if detections.tracker_id is not None:
-                unique_ids.update(detections.tracker_id.tolist())
-
-            # team classification, players only
-            team_ids_full = np.full(len(detections), -1, dtype=int)
-            player_mask = detections.class_id == PLAYER_CLASS_ID
-
-            start = perf_counter()
-
-            if player_mask.any():
-                player_crops = extract_crops(frame, detections.xyxy[player_mask])
-                stable_preds = team_classifier.predict_tracked(
-                    player_crops,
-                    detections.tracker_id[player_mask]
-                )
-                team_ids_full[player_mask] = stable_preds
-
-            classification_time += (
-                perf_counter() - start
-            )
-
-            start = perf_counter()
-
-            annotated_frame = annotate_frame(frame, detections, team_ids_full, annotators)
-
-            writer.write(annotated_frame)
-
-            annotation_time += (
-                perf_counter() - start
-            )
-    finally:
-        writer.release()
-
-    print(f"\nDone. Saved annotated video to: {output_path}")
-    print(f"Unique track IDs seen across the clip: {len(unique_ids)}")
-    print(
-        "(Rough sanity check, not a formal metric: expect somewhere around "
-        "22 players + ref(s) + ball if tracking stays stable. A much higher "
-        "count usually means frequent ID switches from occlusions/re-entries.)"
-    )
-
-    print("\nTiming summary:")
-    print(
-        f"Detection:       {detection_time:.2f}s"
-    )
-    print(
-        f"Tracking:        {tracking_time:.2f}s"
-    )
-    print(
-        f"Classification:  {classification_time:.2f}s"
-    )
-    print(
-        f"Annotation/write:{annotation_time:.2f}s"
-    )
 
 
 def main():
