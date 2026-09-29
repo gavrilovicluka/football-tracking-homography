@@ -3,7 +3,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from config import DEFAULT_OUTPUT_PATH
+from football_tracking.config import DEFAULT_OUTPUT_PATH
 
 
 def is_valid_time(value: str) -> bool:

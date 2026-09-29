@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from ultralytics import YOLO
 
-from config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE
+from football_tracking.config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE
 
 
 class PitchLandmarkDetector:

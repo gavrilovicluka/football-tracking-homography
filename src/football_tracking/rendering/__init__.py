@@ -4,7 +4,7 @@ import supervision as sv
 from sports.annotators.soccer import draw_pitch, draw_points_on_pitch
 from sports.configs.soccer import SoccerPitchConfiguration
 
-from constants import BALL_CLASS_ID, CLASS_NAMES, GOALKEEPER_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID
+from football_tracking.schema import BALL_CLASS_ID, CLASS_NAMES, GOALKEEPER_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID
 
 # Display palette indices: 0/1 = teams, then goalkeeper, referee, ball, unclassified player
 DISPLAY_COLORS = sv.ColorPalette.from_hex([

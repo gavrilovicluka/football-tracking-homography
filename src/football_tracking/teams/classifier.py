@@ -29,12 +29,12 @@ from transformers import SiglipVisionModel, SiglipImageProcessor
 from sklearn.cluster import KMeans
 import umap
 
-from config import BATCH_SIZE, PLAYER_CROPS_SAMPLE_COUNT, SIGLIP_MODEL_NAME
-from constants import PLAYER_CLASS_ID
-from video_io import get_video_info
+from football_tracking.config import BATCH_SIZE, PLAYER_CROPS_SAMPLE_COUNT, SIGLIP_MODEL_NAME
+from football_tracking.schema import PLAYER_CLASS_ID
+from football_tracking.media.video import get_video_info
 
 if TYPE_CHECKING:
-    from detector import FootballDetector
+    from football_tracking.detection.players import FootballDetector
 
 def valid_box_mask(frame_shape: tuple[int, ...], xyxy: np.ndarray) -> np.ndarray:
     """True for boxes that still have a positive area after clipping to the frame."""

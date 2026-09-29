@@ -12,7 +12,7 @@ from typing import Iterator
 import numpy as np
 import supervision as sv
 
-from config import (
+from football_tracking.config import (
     CLASSIFICATION_INTERVAL,
     PITCH_CONFIDENCE,
     PITCH_IMAGE_SIZE,
@@ -20,12 +20,12 @@ from config import (
     PLAYER_CROPS_SAMPLE_COUNT,
     WEIGHTS_PATH,
 )
-from constants import PLAYER_CLASS_ID
-from detector import FootballDetector
-from pitch_landmark_detector import PitchLandmarkDetector
-from pitch_projection import PitchProjector
-from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops, valid_box_mask
-from tracker import PlayerTracker
+from football_tracking.schema import PLAYER_CLASS_ID
+from football_tracking.detection.players import FootballDetector
+from football_tracking.detection.pitch import PitchLandmarkDetector
+from football_tracking.geometry.projection import PitchProjector
+from football_tracking.teams.classifier import TeamClassifier, collect_fitting_crops, extract_crops, valid_box_mask
+from football_tracking.tracking.tracker import PlayerTracker
 
 
 @dataclass

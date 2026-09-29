@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MODELS_DIR = PROJECT_ROOT / "models"
 DOWNLOADS_DIR = PROJECT_ROOT / "downloads"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"

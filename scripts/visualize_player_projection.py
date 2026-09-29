@@ -4,16 +4,16 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE, PITCH_KEYPOINT_WEIGHTS_PATH, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
-from constants import PLAYER_CLASS_ID
-from rendering import draw_projection
+from football_tracking.config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE, PITCH_KEYPOINT_WEIGHTS_PATH, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
+from football_tracking.schema import PLAYER_CLASS_ID
+from football_tracking.rendering import draw_projection
 
 import supervision as sv
 
-from detector import FootballDetector
-from pitch_projection import PitchProjector
-from team_classifier import TeamClassifier, collect_fitting_crops, extract_crops
-from pitch_landmark_detector import PitchLandmarkDetector
+from football_tracking.detection.players import FootballDetector
+from football_tracking.geometry.projection import PitchProjector
+from football_tracking.teams.classifier import TeamClassifier, collect_fitting_crops, extract_crops
+from football_tracking.detection.pitch import PitchLandmarkDetector
 
 def visualize_player_projection(
     video_path: Path,

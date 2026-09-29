@@ -5,8 +5,8 @@ import cv2
 
 import supervision as sv
 
-from config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE, PITCH_KEYPOINT_WEIGHTS_PATH
-from pitch_landmark_detector import PitchLandmarkDetector
+from football_tracking.config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE, PITCH_KEYPOINT_WEIGHTS_PATH
+from football_tracking.detection.pitch import PitchLandmarkDetector
 
 from sports.configs.soccer import SoccerPitchConfiguration
 from sports.annotators.soccer import draw_pitch, draw_points_on_pitch
