@@ -10,20 +10,18 @@ Usage:
 import argparse
 from pathlib import Path
 
+from config import OUTPUTS_DIR, multiview_output_paths
 from interactive_viewer import MultiViewPlayer
+from rendering import TILE_ORDER
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
+    parser.add_argument("--output-dir", type=Path, default=OUTPUTS_DIR)
     args = parser.parse_args()
 
-    paths = {
-        "original": args.output_dir / "original.mp4",
-        "annotated": args.output_dir / "annotated.mp4",
-        "keypoints": args.output_dir / "keypoints.mp4",
-        "projection": args.output_dir / "projection.mp4",
-    }
+    all_paths = multiview_output_paths(args.output_dir)
+    paths = {name: all_paths[name] for name in TILE_ORDER}
 
     missing = [name for name, path in paths.items() if not path.exists()]
     if missing:

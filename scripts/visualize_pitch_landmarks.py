@@ -5,7 +5,7 @@ import cv2
 
 import supervision as sv
 
-from config import PITCH_KEYPOINT_WEIGHTS_PATH
+from config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE, PITCH_KEYPOINT_WEIGHTS_PATH
 from pitch_landmark_detector import PitchLandmarkDetector
 
 from sports.configs.soccer import SoccerPitchConfiguration
@@ -35,8 +35,8 @@ def visualize_pitch_landmarks(
 
     pitch_detector = PitchLandmarkDetector(
         weights_path=weights_path,
-        conf=0.5,
-        imgsz=960,
+        conf=PITCH_CONFIDENCE,
+        imgsz=PITCH_IMAGE_SIZE,
         device=device,
     )
 

@@ -3,6 +3,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from config import DEFAULT_OUTPUT_PATH
+
 
 def is_valid_time(value: str) -> bool:
     if not value:
@@ -29,7 +31,7 @@ class ApplicationUI:
         self.duration = tk.StringVar(value="15")
 
         self.output_path = tk.StringVar(
-            value="outputs/tracked_output.mp4"
+            value=str(DEFAULT_OUTPUT_PATH)
         )
 
         self.confidence = tk.StringVar(value="0.25")

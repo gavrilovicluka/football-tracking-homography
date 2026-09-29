@@ -14,6 +14,8 @@ import supervision as sv
 
 from config import (
     CLASSIFICATION_INTERVAL,
+    PITCH_CONFIDENCE,
+    PITCH_IMAGE_SIZE,
     PITCH_KEYPOINT_WEIGHTS_PATH,
     PLAYER_CROPS_SAMPLE_COUNT,
     WEIGHTS_PATH,
@@ -144,8 +146,8 @@ def create_analyzer(
     conf: float = 0.25,
     device: str = "cpu",
     with_pitch: bool = False,
-    pitch_conf: float = 0.5,
-    pitch_imgsz: int = 960,
+    pitch_conf: float = PITCH_CONFIDENCE,
+    pitch_imgsz: int = PITCH_IMAGE_SIZE,
     pitch_detect_interval: int = 1,
 ) -> FrameAnalyzer:
     """Loads the models and fits the team classifier on sample frames of the video."""

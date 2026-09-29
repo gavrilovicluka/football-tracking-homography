@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from config import PITCH_KEYPOINT_WEIGHTS_PATH, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
+from config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE, PITCH_KEYPOINT_WEIGHTS_PATH, PLAYER_CROPS_SAMPLE_COUNT, WEIGHTS_PATH
 from constants import PLAYER_CLASS_ID
 from rendering import draw_projection
 
@@ -44,8 +44,8 @@ def visualize_player_projection(
 
     pitch_detector = PitchLandmarkDetector(
         weights_path=pitch_weights_path,
-        conf=0.5,
-        imgsz=960,
+        conf=PITCH_CONFIDENCE,
+        imgsz=PITCH_IMAGE_SIZE,
         device=device,
     )
 

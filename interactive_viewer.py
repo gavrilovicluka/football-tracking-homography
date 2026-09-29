@@ -29,12 +29,10 @@ Controls:
 
 Usage:
     from interactive_viewer import MultiViewPlayer
-    player = MultiViewPlayer({
-        "original": "outputs/original.mp4",
-        "annotated": "outputs/annotated.mp4",
-        "keypoints": "outputs/keypoints.mp4",
-        "projection": "outputs/projection.mp4",
-    })
+    from config import multiview_output_paths
+    from rendering import TILE_ORDER
+    paths = multiview_output_paths()
+    player = MultiViewPlayer({name: paths[name] for name in TILE_ORDER})
     player.run()
 """
 import time

@@ -25,6 +25,7 @@ from pathlib import Path
 import traceback
 
 from app_ui import ApplicationUI
+from config import DEFAULT_CLIP_PATH, DEFAULT_OUTPUT_PATH
 from interactive_viewer import MultiViewPlayer
 from pipelines import process_video, process_video_multiview
 from video_io import download_youtube_clip
@@ -63,7 +64,7 @@ def parse_arguments():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("outputs/tracked_output.mp4"),
+        default=DEFAULT_OUTPUT_PATH,
     )
 
     parser.add_argument(
@@ -102,7 +103,7 @@ def run_from_cli(args):
     else:
         video_path = download_youtube_clip(
             args.youtube_url,
-            output_path="downloads/clip.mp4",
+            output_path=DEFAULT_CLIP_PATH,
             start_time=args.start,
             duration=args.duration,
         )
@@ -134,7 +135,7 @@ def run_from_ui():
                 else:
                     video_path = download_youtube_clip(
                         args["youtube_url"],
-                        output_path="downloads/clip.mp4",
+                        output_path=DEFAULT_CLIP_PATH,
                         start_time=args["start"],
                         duration=args["duration"],
                     )

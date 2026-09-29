@@ -17,8 +17,14 @@ import cv2
 from tqdm import tqdm
 
 from analyzer import create_analyzer
-from rendering import (
+from config import (
     LABEL_HEIGHT,
+    PITCH_CONFIDENCE,
+    PITCH_DETECT_INTERVAL,
+    PITCH_IMAGE_SIZE,
+    multiview_output_paths,
+)
+from rendering import (
     annotate_frame,
     build_annotators,
     compose_grid,
@@ -67,9 +73,9 @@ def process_video_multiview(
     output_dir: Path,
     conf: float = 0.25,
     device: str = "cpu",
-    pitch_conf: float = 0.5,
-    pitch_imgsz: int = 960,
-    pitch_detect_interval: int = 1,
+    pitch_conf: float = PITCH_CONFIDENCE,
+    pitch_imgsz: int = PITCH_IMAGE_SIZE,
+    pitch_detect_interval: int = PITCH_DETECT_INTERVAL,
 ) -> dict[str, Path]:
     """
     Runs the full analysis over the whole video once and writes the
@@ -101,21 +107,14 @@ def process_video_multiview(
     pitch_config = analyzer.projector.config
     annotators = build_annotators()
 
-    paths = {
-        "original": output_dir / "original.mp4",
-        "annotated": output_dir / "annotated.mp4",
-        "keypoints": output_dir / "keypoints.mp4",
-        "projection": output_dir / "projection.mp4",
-    }
+    paths = multiview_output_paths(output_dir)
     writers = {
-        name: VideoWriter(path, fps=fps, width=width, height=height)
-        for name, path in paths.items()
+        name: VideoWriter(paths[name], fps=fps, width=width, height=height)
+        for name in ("original", "annotated", "keypoints", "projection")
     }
 
     tile_w, tile_h = width // 2, height // 2
     combined_w, combined_h = tile_w * 2, (tile_h + LABEL_HEIGHT) * 2
-
-    paths["combined"] = output_dir / "combined.mp4"
     writers["combined"] = VideoWriter(paths["combined"], fps=fps, width=combined_w, height=combined_h)
 
     try:
