@@ -6,8 +6,8 @@ MODELS_DIR = PROJECT_ROOT / "models"
 DOWNLOADS_DIR = PROJECT_ROOT / "downloads"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
-WEIGHTS_PATH = MODELS_DIR / "football_players_yolo11s_best.pt"
-PITCH_KEYPOINT_WEIGHTS_PATH = MODELS_DIR / "pitch_landmarks_yolo11n_best.pt"
+WEIGHTS_PATH = MODELS_DIR / "football_players_yolo11m_best.pt"
+PITCH_KEYPOINT_WEIGHTS_PATH = MODELS_DIR / "pitch_landmarks_yolo11m_best.pt"
 SIGLIP_MODEL_NAME = "google/siglip-base-patch16-224"
 
 DEFAULT_CLIP_PATH = DOWNLOADS_DIR / "clip.mp4"

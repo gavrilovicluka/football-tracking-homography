@@ -144,10 +144,10 @@ These scripts require the `[debug]` extra:
 **Pitch landmarks:**
 
 ```bash
-python -m scripts.visualize_pitch_landmarks --video-path downloads/clip.mp4 --num-frames 6 --device 0
+python -m scripts.visualize_pitch_landmarks --video-path downloads/clip.mp4 --num-frames 6
 ```
 
 **Player projection:**
 ```bash
-python -m scripts.visualize_player_projection --video-path downloads/clip.mp4 --num-frames 1 --device 0
+python -m scripts.visualize_player_projection --video-path downloads/clip.mp4 --num-frames 5
 ```

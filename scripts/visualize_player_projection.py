@@ -257,7 +257,7 @@ def main():
         video_path=args.video_path,
         pitch_weights_path=PITCH_KEYPOINT_WEIGHTS_PATH,
         player_weights_path=WEIGHTS_PATH,
-        num_frames=1,
+        num_frames=args.num_frames,
         device=args.device,
     )
 
