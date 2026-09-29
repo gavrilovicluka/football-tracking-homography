@@ -122,6 +122,7 @@ def run_from_cli(args):
 
 def run_from_ui():
     app = ApplicationUI()
+    app_closed = False
     try:
         while True:
             args = app.run()
@@ -140,6 +141,18 @@ def run_from_ui():
                         duration=args["duration"],
                     )
 
+                if args["interactive"]:
+                    paths = process_video_multiview(
+                        video_path=video_path,
+                        output_dir=args["output"],
+                        conf=args["conf"],
+                        device=args["device"],
+                    )
+                    app.close()
+                    app_closed = True
+                    MultiViewPlayer(paths).run()
+                    break
+
                 process_video(
                     video_path=video_path,
                     output_path=args["output"],
@@ -156,13 +169,16 @@ def run_from_ui():
 
             except Exception as error:
                 traceback.print_exc()
+                if app_closed:
+                    raise
 
                 app.show_error(
                     "Processing failed",
                     str(error),
                 )
     finally:
-        app.close()
+        if not app_closed:
+            app.close()
 
 
 if __name__ == "__main__":

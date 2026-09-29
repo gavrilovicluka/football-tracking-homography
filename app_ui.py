@@ -36,6 +36,8 @@ class ApplicationUI:
 
         self.confidence = tk.StringVar(value="0.25")
         self.device = tk.StringVar(value="cpu")
+        self.interactive = tk.BooleanVar(value=False)
+        self._output_mode_interactive = False
 
         self.result = None
 
@@ -283,33 +285,48 @@ class ApplicationUI:
             pady=(0, 10),
         )
 
-        ttk.Label(
+        self.output_label = ttk.Label(
             output_frame,
             text="Output video:",
-        ).grid(
+        )
+        self.output_label.grid(
             row=0,
             column=0,
             sticky="w",
         )
 
-        ttk.Entry(
+        self.output_entry = ttk.Entry(
             output_frame,
             textvariable=self.output_path,
             width=50,
-        ).grid(
+        )
+        self.output_entry.grid(
             row=1,
             column=0,
             sticky="ew",
         )
 
-        ttk.Button(
+        self.browse_output_button = ttk.Button(
             output_frame,
             text="Browse...",
             command=self._browse_output,
-        ).grid(
+        )
+        self.browse_output_button.grid(
             row=1,
             column=1,
             padx=(10, 0),
+        )
+
+        ttk.Checkbutton(
+            output_frame,
+            text="Open 4-panel review",
+            variable=self.interactive,
+            command=self._update_output_controls,
+        ).grid(
+            row=2,
+            column=0,
+            sticky="w",
+            pady=(8, 0),
         )
 
         # -------------------------------------------------
@@ -340,6 +357,17 @@ class ApplicationUI:
             self.video_path.set(file_path)
 
     def _browse_output(self):
+        if self.interactive.get():
+            current_path = Path(self.output_path.get())
+            initial_path = current_path if current_path.is_dir() else DEFAULT_OUTPUT_PATH.parent.parent
+            directory = filedialog.askdirectory(
+                title="Select output folder",
+                initialdir=str(initial_path),
+            )
+            if directory:
+                self.output_path.set(directory)
+            return
+
         file_path = filedialog.asksaveasfilename(
             title="Select output video",
             defaultextension=".mp4",
@@ -350,6 +378,22 @@ class ApplicationUI:
 
         if file_path:
             self.output_path.set(file_path)
+
+    def _update_output_controls(self):
+        interactive = self.interactive.get()
+        if interactive != self._output_mode_interactive:
+            current_value = self.output_path.get().strip()
+            if current_value:
+                current_path = Path(current_value)
+                if interactive:
+                    self.output_path.set(str(current_path.parent))
+                else:
+                    self.output_path.set(str(current_path / "tracked_output.mp4"))
+            self._output_mode_interactive = interactive
+
+        self.output_label.configure(
+            text="Output folder:" if interactive else "Output video:"
+        )
 
     def _update_source_controls(self):
         is_file = self.source_type.get() == "file"
@@ -466,7 +510,7 @@ class ApplicationUI:
 
         output_path = Path(output_value)
 
-        if output_path.suffix.lower() != ".mp4":
+        if not self.interactive.get() and output_path.suffix.lower() != ".mp4":
             messagebox.showerror(
                 "Invalid output",
                 "Output file must have the .mp4 extension.",
@@ -486,6 +530,7 @@ class ApplicationUI:
             "output": output_path,
             "conf": confidence,
             "device": self.device.get(),
+            "interactive": self.interactive.get(),
         }
 
         self.root.quit()
