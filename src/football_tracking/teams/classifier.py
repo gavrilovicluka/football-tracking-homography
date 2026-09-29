@@ -13,30 +13,83 @@ assign_team_ids() applies per-track majority voting on top of predict(), so a gi
 tracked player's team assignment stabilizes over time instead of flickering frame
 to frame on noisy single-frame predictions.
 """
+from __future__ import annotations
+
 from collections import defaultdict, Counter
+from pathlib import Path
 from time import perf_counter
-from typing import List
+from typing import TYPE_CHECKING, List
 
 import numpy as np
+import supervision as sv
 import torch
 from PIL import Image
+from tqdm import tqdm
 from transformers import SiglipVisionModel, SiglipImageProcessor
 from sklearn.cluster import KMeans
 import umap
 
-from config import BATCH_SIZE, SIGLIP_MODEL_NAME
+from football_tracking.config import BATCH_SIZE, PLAYER_CROPS_SAMPLE_COUNT, SIGLIP_MODEL_NAME
+from football_tracking.schema import PLAYER_CLASS_ID
+from football_tracking.media.video import get_video_info
+
+if TYPE_CHECKING:
+    from football_tracking.detection.players import FootballDetector
+
+def valid_box_mask(frame_shape: tuple[int, ...], xyxy: np.ndarray) -> np.ndarray:
+    """True for boxes that still have a positive area after clipping to the frame."""
+    h, w = frame_shape[:2]
+    boxes = xyxy.astype(int)
+    x1, y1 = np.maximum(boxes[:, 0], 0), np.maximum(boxes[:, 1], 0)
+    x2, y2 = np.minimum(boxes[:, 2], w), np.minimum(boxes[:, 3], h)
+    return (x2 > x1) & (y2 > y1)
+
 
 def extract_crops(frame: np.ndarray, xyxy: np.ndarray) -> List[np.ndarray]:
     """Crops out each box from a frame. xyxy: (N, 4) array of [x1, y1, x2, y2]."""
-
     # TODO: can be replaced with sv.crop_image(frame, xyxy)
     crops = []
     h, w = frame.shape[:2]
-    for x1, y1, x2, y2 in xyxy.astype(int):
+    crops = []
+    for x1, y1, x2, y2 in xyxy[valid_box_mask(frame.shape, xyxy)].astype(int):
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(w, x2), min(h, y2)
-        if x2 > x1 and y2 > y1:
-            crops.append(frame[y1:y2, x1:x2])
+        crops.append(frame[y1:y2, x1:x2])
+    return crops
+
+
+def collect_fitting_crops(
+        video_path: Path,
+        detector: FootballDetector,
+        n_samples: int = PLAYER_CROPS_SAMPLE_COUNT
+) -> list:
+    """Runs detection (no tracking needed) on evenly-spaced sample frames across
+    the clip, collecting player crops to fit the team classifier on."""
+    info = get_video_info(video_path)
+    sample_indices = set(
+        np.linspace(
+            0,
+            info["frame_count"] - 1,
+            n_samples,
+            dtype=int
+        )
+    )
+
+    frame_generator = sv.get_video_frames_generator(
+        source_path=video_path
+    )
+
+    crops = []
+    for i, frame in enumerate(tqdm(frame_generator, desc="Collecting player crops")):
+        if i not in sample_indices:
+            continue
+        detections = detector.detect(frame)
+        detections = detections[
+            detections.class_id == PLAYER_CLASS_ID
+        ]
+        players_crops = [sv.crop_image(frame, xyxy) for xyxy in detections.xyxy]
+        crops += players_crops
+
     return crops
 
 

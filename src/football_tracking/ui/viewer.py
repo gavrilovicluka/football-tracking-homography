@@ -28,13 +28,11 @@ Controls:
     q / ESC                   quit
 
 Usage:
-    from interactive_viewer import MultiViewPlayer
-    player = MultiViewPlayer({
-        "original": "outputs/original.mp4",
-        "annotated": "outputs/annotated.mp4",
-        "keypoints": "outputs/keypoints.mp4",
-        "projection": "outputs/projection.mp4",
-    })
+    from football_tracking.ui.viewer import MultiViewPlayer
+    from football_tracking.config import multiview_output_paths
+    from football_tracking.rendering import TILE_ORDER
+    paths = multiview_output_paths()
+    player = MultiViewPlayer({name: paths[name] for name in TILE_ORDER})
     player.run()
 """
 import time
@@ -43,7 +41,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from constants import BUTTON_WIDTH, CONTROL_BAR_HEIGHT, LABEL_HEIGHT, TILE_ORDER, TILE_TITLES
+from football_tracking.rendering import LABEL_HEIGHT, TILE_ORDER, TILE_TITLES
+
+CONTROL_BAR_HEIGHT = 40
+BUTTON_WIDTH = 40
 
 
 class MultiViewPlayer:

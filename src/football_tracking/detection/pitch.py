@@ -3,13 +3,15 @@ from pathlib import Path
 import numpy as np
 from ultralytics import YOLO
 
+from football_tracking.config import PITCH_CONFIDENCE, PITCH_IMAGE_SIZE
+
 
 class PitchLandmarkDetector:
     def __init__(
         self,
         weights_path: str | Path,
-        conf: float = 0.5,
-        imgsz: int = 960,
+        conf: float = PITCH_CONFIDENCE,
+        imgsz: int = PITCH_IMAGE_SIZE,
         device: str = "cpu",
     ):
         self.model = YOLO(str(weights_path))

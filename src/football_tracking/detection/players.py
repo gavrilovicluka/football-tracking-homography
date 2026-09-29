@@ -9,8 +9,8 @@ import numpy as np
 import supervision as sv
 from ultralytics import YOLO
 
-from config import IMAGE_SIZE
-from constants import DEFAULT_CLASS_CONF_THRESHOLDS
+from football_tracking.config import IMAGE_SIZE
+from football_tracking.schema import DEFAULT_CLASS_CONF_THRESHOLDS
 
 class FootballDetector:
     def __init__(
@@ -35,7 +35,6 @@ class FootballDetector:
             device=self.device,
             verbose=False,
         )[0]
-        # return sv.Detections.from_ultralytics(result)
         detections = sv.Detections.from_ultralytics(result)
         return self._filter_by_class_conf(detections)
 

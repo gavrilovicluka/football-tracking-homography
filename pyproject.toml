@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "football-tracking-homography"
+version = "0.1.0"
+description = "Football player tracking and pitch projection"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ultralytics",
+    "supervision",
+    "opencv-python",
+    "yt-dlp",
+    "tqdm",
+    "numpy",
+    "transformers",
+    "umap-learn",
+    "scikit-learn",
+    "torch",
+    "Pillow",
+    "sports @ git+https://github.com/roboflow/sports.git",
+]
+
+[project.optional-dependencies]
+debug = ["matplotlib"]
+
+[project.scripts]
+football-track = "football_tracking.cli:main"
+football-view = "football_tracking.cli:view"
+
+[tool.setuptools.packages.find]
+where = ["src"]

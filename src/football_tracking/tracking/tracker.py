@@ -33,7 +33,6 @@ class PlayerTracker:
 
     def update(self, detections: sv.Detections) -> sv.Detections:
         """Returns detections with .tracker_id populated."""
-        # return self.tracker.update_with_detections(detections)
         tracked = self.tracker.update_with_detections(detections)
         if tracked.tracker_id is None or len(tracked) == 0:
             return tracked

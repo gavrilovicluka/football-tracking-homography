@@ -1,0 +1,1 @@
+"""Football player tracking and pitch projection application."""
