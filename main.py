@@ -182,10 +182,6 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
 
             if player_mask.any():
                 player_crops = extract_crops(frame, detections.xyxy[player_mask])
-                # raw_preds = team_classifier.predict(player_crops)
-                # stable_preds = team_classifier.assign_team_ids(
-                #     detections.tracker_id[player_mask], raw_preds
-                # )
                 stable_preds = team_classifier.predict_tracked(
                     player_crops,
                     detections.tracker_id[player_mask]
@@ -204,8 +200,6 @@ def process_video(video_path: Path, output_path: Path, conf: float = 0.25, devic
             ])
             # sv.BoxAnnotator colors by detections.class_id by default - temporarily
             # substitute so it colors by team/display index instead
-            # display_detections = detections.copy()
-            # display_detections.class_id = color_indices
             display_detections = sv.Detections(
                 xyxy=detections.xyxy.copy(),
                 mask=detections.mask.copy() if detections.mask is not None else None,
@@ -271,16 +265,15 @@ def run_from_cli(args):
         )
 
     if args.interactive:
-        paths = process_video_multiview(video_path=video_path, output_dir=args.output.parent, device=args.device)
+        paths = process_video_multiview(
+            video_path=video_path,
+            output_dir=args.output.parent,
+            conf=args.conf,
+            device=args.device,
+        )
         MultiViewPlayer(paths).run()
     else:
         process_video(video_path=video_path, output_path=args.output, conf=args.conf, device=args.device)
-    # process_video(
-    #     video_path=video_path,
-    #     output_path=args.output,
-    #     conf=args.conf,
-    #     device=args.device,
-    # )
 
 
 def run_from_ui():
@@ -326,9 +319,6 @@ def run_from_ui():
                 )
     finally:
         app.close()
-
-
-    # process_video(video_path, args.output, conf=args.conf, device=args.device)
 
 
 if __name__ == "__main__":

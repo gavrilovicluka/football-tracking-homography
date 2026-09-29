@@ -4,8 +4,6 @@ from tkinter import filedialog, messagebox, ttk
 
 from utils import is_valid_time
 
-from utils import is_valid_time
-
 
 class ApplicationUI:
     def __init__(self):

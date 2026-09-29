@@ -9,3 +9,5 @@ umap-learn
 scikit-learn
 torch
 Pillow
+matplotlib
+sports @ git+https://github.com/roboflow/sports.git

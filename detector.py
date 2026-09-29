@@ -35,7 +35,6 @@ class FootballDetector:
             device=self.device,
             verbose=False,
         )[0]
-        # return sv.Detections.from_ultralytics(result)
         detections = sv.Detections.from_ultralytics(result)
         return self._filter_by_class_conf(detections)
 
