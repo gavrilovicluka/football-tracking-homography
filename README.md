@@ -55,6 +55,24 @@ flowchart LR
 
 Requires Python 3.10+.
 
+Create and activate a virtual environment from the repository root:
+
+```bash
+python -m venv .venv
+```
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
+```
+
 Install the project from the repository root:
 
 ```bash
