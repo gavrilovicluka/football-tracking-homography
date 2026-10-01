@@ -1,4 +1,4 @@
-# ⚽ Football Tracking Homography 
+# ⚽ Football Tracking Homography
 
 This project analyzes football match videos using computer vision. The system detects and tracks players, goalkeepers, referees, and the ball, classifies players by team, detects pitch landmarks, and projects player positions onto a 2D model of the football pitch using homography.
 
@@ -37,7 +37,7 @@ flowchart LR
 
     K[📹 Annotated<br>Output]
 
-    Detection --> K 
+    Detection --> K
     Pitch --> K
 ```
 
@@ -46,9 +46,9 @@ flowchart LR
 - **YOLO11** - Object and pitch landmark detection
 - **ByteTrack** - Multi-object tracking across video frames.
 - **SigLIP, UMAP, and KMeans** are used to group players into teams based on their appearance.
-    - **SigLIP** - Player appearance embeddings
-    - **UMAP** - Embedding dimensionality reduction
-    - **KMeans** - Team clustering
+  - **SigLIP** - Player appearance embeddings
+  - **UMAP** - Embedding dimensionality reduction
+  - **KMeans** - Team clustering
 - **Roboflow Sports** - Football pitch definitions and view transformation utilities.
 
 ## 🚀 Setup
@@ -137,6 +137,8 @@ The installed `football-track` command accepts the same options as `python main.
 football-track --video-path downloads/clip.mp4
 ```
 
+Frame analysis is cached under `outputs/.cache/frame-analysis/`. Re-running the same video with the same analysis settings reuses detections, tracking, team classifications, and pitch projections while still writing the requested output videos. The cache is invalidated when the source video, model files, or relevant settings change. Delete that cache directory to force analysis to run again.
+
 ## 👀 Review Existing Outputs
 
 Open previously generated interactive multiview without processing the video again:
@@ -171,6 +173,7 @@ python -m scripts.visualize_pitch_landmarks --video-path downloads/clip.mp4 --nu
 ```
 
 **Player projection:**
+
 ```bash
 python -m scripts.visualize_player_projection --video-path downloads/clip.mp4 --num-frames 5
 ```
