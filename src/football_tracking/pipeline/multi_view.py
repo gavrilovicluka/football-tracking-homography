@@ -16,6 +16,8 @@ import cv2
 from tqdm import tqdm
 
 from football_tracking.pipeline.analyzer import create_analyzer
+from football_tracking.pipeline.analysis_cache import create_frame_analysis_cache
+from football_tracking.geometry.projection import PitchProjector
 from football_tracking.config import (
     LABEL_HEIGHT,
     PITCH_CONFIDENCE,
@@ -59,8 +61,9 @@ def process_video_multiview(
     width, height, fps = info["width"], info["height"], info["fps"]
     print(f"Video: {width}x{height} @ {fps:.1f}fps, {info['frame_count']} frames")
 
-    analyzer = create_analyzer(
-        video_path,
+    analysis_cache = create_frame_analysis_cache(
+        video_path=video_path,
+        frame_count=info["frame_count"],
         fps=fps,
         conf=conf,
         device=device,
@@ -69,7 +72,22 @@ def process_video_multiview(
         pitch_imgsz=pitch_imgsz,
         pitch_detect_interval=pitch_detect_interval,
     )
-    pitch_config = analyzer.projector.config
+    analyzer = None
+    if analysis_cache.hit:
+        print("Using cached frame analysis; detection and classification are skipped.")
+        pitch_config = PitchProjector().config
+    else:
+        analyzer = create_analyzer(
+            video_path,
+            fps=fps,
+            conf=conf,
+            device=device,
+            with_pitch=True,
+            pitch_conf=pitch_conf,
+            pitch_imgsz=pitch_imgsz,
+            pitch_detect_interval=pitch_detect_interval,
+        )
+        pitch_config = analyzer.projector.config
     annotators = build_annotators()
 
     paths = multiview_output_paths(output_dir)
@@ -86,7 +104,11 @@ def process_video_multiview(
         for frame_idx, frame in enumerate(
             tqdm(read_frames(video_path), total=info["frame_count"], desc="Processing")
         ):
-            result = analyzer.process(frame, frame_idx)
+            if analysis_cache.hit:
+                result = analysis_cache.results[frame_idx]
+            else:
+                result = analyzer.process(frame, frame_idx)
+                analysis_cache.record(result)
 
             with analyzer.timer.measure("Annotation/write"):
                 annotated_frame = annotate_frame(frame, result.detections, result.team_ids, annotators)
@@ -115,6 +137,8 @@ def process_video_multiview(
     print("Saved:")
     for name, path in paths.items():
         print(f"  {name}: {path}")
-    analyzer.timer.report()
+    if not analysis_cache.hit:
+        analysis_cache.save()
+        analyzer.timer.report()
 
     return paths
