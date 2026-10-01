@@ -27,20 +27,16 @@ def download_youtube_clip(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     ydl_opts = {
-        "format": "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "bestvideo+bestaudio/best",
+        # "format": "137",
+
         "outtmpl": str(output_path),
-        "merge_output_format": "mp4",
+        # "merge_output_format": "mp4",
         "noplaylist": True,
         "color": "no_color",
         # "extractor_args": {"youtube": {"player_client": ["web"]}},
 
-        "remote_components": "ejs:github",
-
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["mweb"],
-            },
-        },
+        "remote_components": ["ejs:github"],
         
         "retries": 10,
         "fragment_retries": 10,
