@@ -161,10 +161,13 @@ The debug scripts can be used to inspect individual stages of the pipeline.
 
 These scripts require the `[debug]` extra:
 
-**Objects detection:**
+**Objects detection and ball tracking:**
+
 ```bash
 python -m scripts.process_detections --video-path downloads/clip.mp4 --output-path outputs/detections.mp4
 ```
+
+The ball path is chosen using the whole clip, so false detections are filtered out and gaps of up to 3 frames are interpolated (`--max-interpolation-gap`). The video shows the tracked ball as a green triangle (detected) or an orange one (interpolated), with all raw ball detections in grey. A per-frame `outputs/detections_ball_track.csv` is also written. Afterwards a viewer opens: `a`/`d` or the arrow keys step through frames, `space` plays/pauses, the slider jumps, and `q` quits. Use `--view-only` to reopen an existing output without processing, or `--no-viewer` to skip it.
 
 **Pitch landmarks:**
 
