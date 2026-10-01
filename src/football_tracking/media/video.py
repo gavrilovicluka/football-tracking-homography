@@ -33,6 +33,19 @@ def download_youtube_clip(
         "noplaylist": True,
         "color": "no_color",
         # "extractor_args": {"youtube": {"player_client": ["web"]}},
+
+        "remote_components": "ejs:github",
+
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb"],
+            },
+        },
+        
+        "retries": 10,
+        "fragment_retries": 10,
+        "file_access_retries": 10,
+        "extractor_retries": 3,
     }
 
     if start_time is not None and duration is not None:

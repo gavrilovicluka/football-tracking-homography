@@ -12,13 +12,17 @@ DISPLAY_COLORS = sv.ColorPalette.from_hex([
     "#0074D9",  # team1
     "#FFDC00",  # goalkeeper
     "#B10DC9",  # referee
-    "#FFFFFF",  # ball
+    "#00FFFF",  # ball
     "#AAAAAA",  # player without team
 ])
 
 TEAM_COLORS = {
     0: sv.Color.from_hex("#B71C13"),
     1: sv.Color.from_hex("#4AA8FB"),
+}
+PROJECTION_CLASS_COLORS = {
+    BALL_CLASS_ID: sv.Color.from_hex("#00FFFF"),
+    REFEREE_CLASS_ID: sv.Color.from_hex("#B10DC9"),
 }
 
 DISPLAY_COLOR_INDEX = {
@@ -54,9 +58,13 @@ def build_annotators() -> tuple[sv.BoxAnnotator, sv.LabelAnnotator]:
 
 
 def make_labels(detections: sv.Detections, team_ids: np.ndarray) -> list[str]:
+    tracker_ids = detections.tracker_id
+    if tracker_ids is None:
+        tracker_ids = np.full(len(detections), -1, dtype=int)
+
     labels = []
     for class_id, tracker_id, team_id in zip(
-        detections.class_id, detections.tracker_id, team_ids
+        detections.class_id, tracker_ids, team_ids
     ):
         name = CLASS_NAMES[class_id]
         tid = f"#{tracker_id}" if tracker_id is not None else ""
@@ -108,6 +116,7 @@ def draw_projection(
     config: SoccerPitchConfiguration,
     pitch_xy: np.ndarray | None,
     team_ids: np.ndarray | None,
+    class_ids: np.ndarray | None = None,
 ) -> np.ndarray:
     """
         Draws a top-down pitch with players colored by team; pitch_xy is None when there is no homography.
@@ -116,8 +125,11 @@ def draw_projection(
     if pitch_xy is None or team_ids is None or len(pitch_xy) == 0:
         return pitch
 
+    if class_ids is None:
+        class_ids = np.full(len(pitch_xy), PLAYER_CLASS_ID, dtype=int)
+
     for team_id, color in TEAM_COLORS.items():
-        team_mask = team_ids == team_id
+        team_mask = (class_ids == PLAYER_CLASS_ID) & (team_ids == team_id)
         if team_mask.any():
             pitch = draw_points_on_pitch(
                 config=config,
@@ -125,6 +137,18 @@ def draw_projection(
                 face_color=color,
                 edge_color=sv.Color.BLACK,
                 radius=10,
+                pitch=pitch,
+            )
+
+    for class_id, color in PROJECTION_CLASS_COLORS.items():
+        class_mask = class_ids == class_id
+        if class_mask.any():
+            pitch = draw_points_on_pitch(
+                config=config,
+                xy=pitch_xy[class_mask],
+                face_color=color,
+                edge_color=sv.Color.BLACK,
+                radius=8 if class_id == BALL_CLASS_ID else 10,
                 pitch=pitch,
             )
     return pitch

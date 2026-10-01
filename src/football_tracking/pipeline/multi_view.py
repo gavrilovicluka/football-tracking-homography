@@ -13,6 +13,7 @@ interactive_viewer.MultiViewPlayer can scrub them together.
 from pathlib import Path
 
 import cv2
+import numpy as np
 from tqdm import tqdm
 
 from football_tracking.pipeline.analyzer import create_analyzer
@@ -31,6 +32,7 @@ from football_tracking.rendering import (
     draw_projection,
 )
 from football_tracking.media.video import read_frames, get_video_info, VideoWriter
+from football_tracking.schema import BALL_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID
 
 
 def process_video_multiview(
@@ -65,6 +67,7 @@ def process_video_multiview(
         conf=conf,
         device=device,
         with_pitch=True,
+        with_classification=False,
         pitch_conf=pitch_conf,
         pitch_imgsz=pitch_imgsz,
         pitch_detect_interval=pitch_detect_interval,
@@ -91,7 +94,16 @@ def process_video_multiview(
             with analyzer.timer.measure("Annotation/write"):
                 annotated_frame = annotate_frame(frame, result.detections, result.team_ids, annotators)
                 keypoints_frame = draw_keypoints(frame, result.landmarks_xy)
-                pitch = draw_projection(pitch_config, result.pitch_xy, result.team_ids[result.player_mask])
+                projection_mask = np.isin(
+                    result.detections.class_id,
+                    [BALL_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID],
+                )
+                pitch = draw_projection(
+                    pitch_config,
+                    result.pitch_xy,
+                    result.team_ids[projection_mask],
+                    result.projection_class_ids,
+                )
                 projection_frame = cv2.resize(pitch, (width, height))
 
                 writers["original"].write(frame)

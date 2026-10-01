@@ -159,6 +159,11 @@ The debug scripts can be used to inspect individual stages of the pipeline.
 
 These scripts require the `[debug]` extra:
 
+**Objects detection:**
+```bash
+python -m scripts.process_detections --video-path downloads/clip.mp4 --output-path outputs/detections.mp4
+```
+
 **Pitch landmarks:**
 
 ```bash

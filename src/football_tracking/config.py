@@ -10,7 +10,7 @@ WEIGHTS_PATH = MODELS_DIR / "football_players_yolo26m_best.pt"
 PITCH_KEYPOINT_WEIGHTS_PATH = MODELS_DIR / "pitch_landmarks_yolo11m_best.pt"
 SIGLIP_MODEL_NAME = "google/siglip-base-patch16-224"
 
-DEFAULT_CLIP_PATH = DOWNLOADS_DIR / "clip.mp4"
+DEFAULT_CLIP_PATH = DOWNLOADS_DIR / "bay-stu.mp4"
 DEFAULT_OUTPUT_PATH = OUTPUTS_DIR / "tracked_output.mp4"
 
 MULTIVIEW_FILENAMES = {
