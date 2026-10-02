@@ -25,7 +25,7 @@ from football_tracking.config import (
 from football_tracking.pipeline.analyzer import FrameResult
 
 
-CACHE_VERSION = 2
+CACHE_VERSION = 4
 
 
 def _file_signature(path: Path) -> dict:
@@ -78,7 +78,7 @@ def create_frame_analysis_cache(
     }
     serialized_metadata = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
     cache_key = hashlib.sha256(serialized_metadata.encode("utf-8")).hexdigest()
-    cache_path = OUTPUTS_DIR / ".cache" / "frame-analysis" / f"{cache_key}.pkl"
+    cache_path = OUTPUTS_DIR / ".cache" / "frame-analysis" / f"{cache_key}_v{CACHE_VERSION}.pkl"
     return FrameAnalysisCache(cache_path, cache_key, frame_count)
 
 
