@@ -21,10 +21,8 @@ TEAM_COLORS = {
     0: sv.Color.from_hex("#B71C13"),
     1: sv.Color.from_hex("#4AA8FB"),
 }
-PROJECTION_CLASS_COLORS = {
-    BALL_CLASS_ID: sv.Color.from_hex("#00FFFF"),
-    REFEREE_CLASS_ID: sv.Color.from_hex("#B10DC9"),
-}
+
+BALL_COLOR = sv.Color.from_hex("#A2FF00")
 
 DISPLAY_COLOR_INDEX = {
     BALL_CLASS_ID: 4,
@@ -148,6 +146,51 @@ def draw_keypoints(frame: np.ndarray, landmark_xy: np.ndarray) -> np.ndarray:
     return output
 
 
+def draw_referee_markers(pitch: np.ndarray, xy: np.ndarray) -> np.ndarray:
+    radius = 14
+    stripe_width = 4
+    scale = 0.1
+    padding = 50
+
+    for point in xy:
+        center_x = int(point[0] * scale) + padding
+        center_y = int(point[1] * scale) + padding
+        cv2.circle(pitch, (center_x, center_y), radius, sv.Color.WHITE.as_bgr(), -1)
+
+        marker_size = radius * 2 + 1
+        marker = np.zeros((marker_size, marker_size), dtype=np.uint8)
+        circle_mask = np.zeros_like(marker)
+        cv2.circle(
+            circle_mask,
+            (radius, radius),
+            radius,
+            255,
+            -1,
+        )
+        for stripe_start in range(-radius, radius + 1, stripe_width * 2):
+            left = stripe_start + radius
+            right = min(left + stripe_width, marker_size)
+            marker[:, max(left, 0):right] = 255
+        marker &= circle_mask
+
+        pitch_height, pitch_width = pitch.shape[:2]
+        top = max(center_y - radius, 0)
+        bottom = min(center_y + radius + 1, pitch_height)
+        left = max(center_x - radius, 0)
+        right = min(center_x + radius + 1, pitch_width)
+        if top >= bottom or left >= right:
+            continue
+        mask_top = top - (center_y - radius)
+        mask_bottom = mask_top + (bottom - top)
+        mask_left = left - (center_x - radius)
+        mask_right = mask_left + (right - left)
+        marker_crop = marker[mask_top:mask_bottom, mask_left:mask_right]
+        pitch[top:bottom, left:right][marker_crop > 0] = sv.Color.BLACK.as_bgr()
+        cv2.circle(pitch, (center_x, center_y), radius, sv.Color.BLACK.as_bgr(), 1)
+
+    return pitch
+
+
 def draw_projection(
     config: SoccerPitchConfiguration,
     pitch_xy: np.ndarray | None,
@@ -159,10 +202,12 @@ def draw_projection(
         Draws a top-down pitch with players colored by team; pitch_xy is None when there is no homography.
     """
     pitch = draw_pitch(config)
+
     if pitch_xy is not None and team_ids is not None and len(pitch_xy) > 0:
         if class_ids is None:
             class_ids = np.full(len(pitch_xy), PLAYER_CLASS_ID, dtype=int)
 
+        # Players
         for team_id, color in TEAM_COLORS.items():
             team_mask = (class_ids == PLAYER_CLASS_ID) & (team_ids == team_id)
             if not team_mask.any():
@@ -172,29 +217,26 @@ def draw_projection(
                 xy=pitch_xy[team_mask],
                 face_color=color,
                 edge_color=sv.Color.BLACK,
-                radius=10,
+                radius=14,
                 pitch=pitch,
             )
 
-        for class_id, color in PROJECTION_CLASS_COLORS.items():
-            class_mask = class_ids == class_id
-            if not class_mask.any():
-                continue
-            pitch = draw_points_on_pitch(
-                config=config,
-                xy=pitch_xy[class_mask],
-                face_color=color,
-                edge_color=sv.Color.BLACK,
-                radius=8 if class_id == BALL_CLASS_ID else 10,
-                pitch=pitch,
+        # Referees
+        referee_mask = class_ids == REFEREE_CLASS_ID
+        if referee_mask.any():
+            pitch = draw_referee_markers(
+                pitch,
+                pitch_xy[referee_mask],
             )
+
+    # Ball is independent of the detection arrays.
     if ball_xy is not None:
         pitch = draw_points_on_pitch(
             config=config,
             xy=np.asarray(ball_xy, dtype=np.float32).reshape(1, 2),
-            face_color=PROJECTION_CLASS_COLORS[BALL_CLASS_ID],
+            face_color=BALL_COLOR,
             edge_color=sv.Color.BLACK,
-            radius=8,
+            radius=10,
             pitch=pitch,
         )
     return pitch
