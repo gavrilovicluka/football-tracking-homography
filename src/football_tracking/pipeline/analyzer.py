@@ -183,20 +183,45 @@ class FrameAnalyzer:
         detections: sv.Detections,
         projection_mask: np.ndarray,
     ) -> np.ndarray | None:
+        projected_detections = detections[projection_mask]
+        image_points = (
+            projected_detections.get_anchors_coordinates(
+                anchor=sv.Position.BOTTOM_CENTER
+            )
+            if projection_mask.any()
+            else np.empty((0, 2), dtype=np.float32)
+        )
+
         # Between detections the last homography and landmarks are reused
         if frame_idx % self.pitch_detect_interval == 0:
-            landmark_xy, landmark_indices, _ = self.pitch_detector.detect(frame)
+            landmark_xy, landmark_indices, landmark_confidences = (
+                self.pitch_detector.detect(frame)
+            )
             self._last_landmark_xy = landmark_xy
-            if len(landmark_xy) >= 4:
-                self._have_homography = self.projector.update(landmark_xy, landmark_indices)
+            validation_point_sets = []
+            if len(image_points) > 0:
+                validation_point_sets.append(image_points)
+            ball_mask = detections.class_id == BALL_CLASS_ID
+            if ball_mask.any():
+                ball_boxes = detections.xyxy[ball_mask]
+                ball_centers = (ball_boxes[:, :2] + ball_boxes[:, 2:]) / 2
+                validation_point_sets.append(ball_centers)
+            validation_points = (
+                np.concatenate(validation_point_sets)
+                if validation_point_sets
+                else None
+            )
+            if self.projector.update(
+                landmark_xy,
+                landmark_indices,
+                landmark_confidences,
+                validation_points,
+            ):
+                self._have_homography = True
 
         if not self._have_homography or not projection_mask.any():
             return None
 
-        projected_detections = detections[projection_mask]
-        image_points = projected_detections.get_anchors_coordinates(
-            anchor=sv.Position.BOTTOM_CENTER
-        )
         raw_pitch_xy = self.projector.transform_points(image_points)
 
         tracker_ids = projected_detections.tracker_id
