@@ -25,7 +25,7 @@ from football_tracking.config import (
 from football_tracking.pipeline.analyzer import FrameResult
 
 
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 
 
 def _file_signature(path: Path) -> dict:

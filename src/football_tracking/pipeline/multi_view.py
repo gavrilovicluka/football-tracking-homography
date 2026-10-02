@@ -21,6 +21,7 @@ from football_tracking.pipeline.analyzer import create_analyzer, track_ball_resu
 from football_tracking.pipeline.analysis_cache import create_frame_analysis_cache
 from football_tracking.geometry.projection import PitchProjector
 from football_tracking.config import (
+    INCLUDE_CLASSIFICATION,
     LABEL_HEIGHT,
     PITCH_CONFIDENCE,
     PITCH_DETECT_INTERVAL,
@@ -89,6 +90,7 @@ def process_video_multiview(
             ball_conf=ball_conf,
             device=device,
             with_pitch=True,
+            with_classification=INCLUDE_CLASSIFICATION,
             pitch_conf=pitch_conf,
             pitch_imgsz=pitch_imgsz,
             pitch_detect_interval=pitch_detect_interval,

@@ -44,3 +44,5 @@ CLASSIFICATION_INTERVAL = 3
 LABEL_HEIGHT = 24
 
 MAX_INTERPOLATION_GAP = 25  # maximum gap for ball track interpolation
+
+INCLUDE_CLASSIFICATION = True  # whether to include classification results in the output

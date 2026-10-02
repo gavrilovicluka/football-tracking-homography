@@ -5,6 +5,7 @@ from tqdm import tqdm
 from football_tracking.pipeline.analyzer import create_analyzer, track_ball_results
 from football_tracking.pipeline.analysis_cache import create_frame_analysis_cache
 from football_tracking.rendering import annotate_frame, build_annotators
+from football_tracking.config import INCLUDE_CLASSIFICATION
 from football_tracking.media.video import read_frames, get_video_info, VideoWriter
 
 
@@ -41,6 +42,7 @@ def process_video(
             ball_conf=ball_conf,
             device=device,
             with_pitch=False,
+            with_classification=INCLUDE_CLASSIFICATION,
         )
         for frame_idx, frame in enumerate(
             tqdm(read_frames(video_path), total=info["frame_count"], desc="Analyzing")
