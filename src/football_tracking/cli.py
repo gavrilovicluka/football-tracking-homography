@@ -81,6 +81,13 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--ball-conf",
+        type=float,
+        default=0.15,
+        help="Minimum confidence for ball candidates before trajectory filtering.",
+    )
+
+    parser.add_argument(
         "--device",
         type=str,
         default="cpu",
@@ -120,11 +127,18 @@ def run_from_cli(args):
             video_path=video_path,
             output_dir=args.output.parent,
             conf=args.conf,
+            ball_conf=args.ball_conf,
             device=args.device,
         )
         MultiViewPlayer(paths).run()
     else:
-        process_video(video_path=video_path, output_path=args.output, conf=args.conf, device=args.device)
+        process_video(
+            video_path=video_path,
+            output_path=args.output,
+            conf=args.conf,
+            ball_conf=args.ball_conf,
+            device=args.device,
+        )
 
 
 def run_from_ui():

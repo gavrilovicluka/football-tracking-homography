@@ -11,12 +11,13 @@ The multiview outputs are aligned 1:1 by frame index, so
 interactive_viewer.MultiViewPlayer can scrub them together.
 """
 from pathlib import Path
+from contextlib import nullcontext
 
 import cv2
 import numpy as np
 from tqdm import tqdm
 
-from football_tracking.pipeline.analyzer import create_analyzer
+from football_tracking.pipeline.analyzer import create_analyzer, track_ball_results
 from football_tracking.pipeline.analysis_cache import create_frame_analysis_cache
 from football_tracking.geometry.projection import PitchProjector
 from football_tracking.config import (
@@ -41,6 +42,7 @@ def process_video_multiview(
     video_path: Path,
     output_dir: Path,
     conf: float = 0.25,
+    ball_conf: float = 0.15,
     device: str = "cpu",
     pitch_conf: float = PITCH_CONFIDENCE,
     pitch_imgsz: int = PITCH_IMAGE_SIZE,
@@ -68,9 +70,9 @@ def process_video_multiview(
         frame_count=info["frame_count"],
         fps=fps,
         conf=conf,
+        ball_conf=ball_conf,
         device=device,
         with_pitch=True,
-        with_classification=False,
         pitch_conf=pitch_conf,
         pitch_imgsz=pitch_imgsz,
         pitch_detect_interval=pitch_detect_interval,
@@ -84,6 +86,7 @@ def process_video_multiview(
             video_path,
             fps=fps,
             conf=conf,
+            ball_conf=ball_conf,
             device=device,
             with_pitch=True,
             pitch_conf=pitch_conf,
@@ -91,6 +94,17 @@ def process_video_multiview(
             pitch_detect_interval=pitch_detect_interval,
         )
         pitch_config = analyzer.projector.config
+
+    if not analysis_cache.hit:
+        for frame_idx, frame in enumerate(
+            tqdm(read_frames(video_path), total=info["frame_count"], desc="Analyzing")
+        ):
+            analysis_cache.record(analyzer.process(frame, frame_idx))
+
+    track_ball_results(analysis_cache.results)
+    if not analysis_cache.hit:
+        analysis_cache.save()
+
     annotators = build_annotators()
 
     paths = multiview_output_paths(output_dir)
@@ -105,26 +119,31 @@ def process_video_multiview(
 
     try:
         for frame_idx, frame in enumerate(
-            tqdm(read_frames(video_path), total=info["frame_count"], desc="Processing")
+            tqdm(read_frames(video_path), total=info["frame_count"], desc="Rendering")
         ):
-            if analysis_cache.hit:
-                result = analysis_cache.results[frame_idx]
-            else:
-                result = analyzer.process(frame, frame_idx)
-                analysis_cache.record(result)
+            result = analysis_cache.results[frame_idx]
 
-            with analyzer.timer.measure("Annotation/write"):
-                annotated_frame = annotate_frame(frame, result.detections, result.team_ids, annotators)
+            timer = analyzer.timer.measure("Annotation/write") if analyzer is not None else nullcontext()
+            with timer:
+                annotated_frame = annotate_frame(
+                    frame,
+                    result.detections,
+                    result.team_ids,
+                    annotators,
+                    ball_track_point=result.ball_track_point,
+                    tracked_ball=True,
+                )
                 keypoints_frame = draw_keypoints(frame, result.landmarks_xy)
                 projection_mask = np.isin(
                     result.detections.class_id,
-                    [BALL_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID],
+                    [PLAYER_CLASS_ID, REFEREE_CLASS_ID],
                 )
                 pitch = draw_projection(
                     pitch_config,
                     result.pitch_xy,
                     result.team_ids[projection_mask],
                     result.projection_class_ids,
+                    ball_xy=result.ball_pitch_xy,
                 )
                 projection_frame = cv2.resize(pitch, (width, height))
 
@@ -149,8 +168,7 @@ def process_video_multiview(
     print("Saved:")
     for name, path in paths.items():
         print(f"  {name}: {path}")
-    if not analysis_cache.hit:
-        analysis_cache.save()
+    if not analysis_cache.hit and analyzer is not None:
         analyzer.timer.report()
 
     return paths

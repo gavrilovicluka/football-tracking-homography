@@ -25,7 +25,7 @@ from football_tracking.config import (
 from football_tracking.pipeline.analyzer import FrameResult
 
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 
 def _file_signature(path: Path) -> dict:
@@ -51,6 +51,7 @@ def create_frame_analysis_cache(
     pitch_conf: float,
     pitch_imgsz: int,
     pitch_detect_interval: int,
+    ball_conf: float = 0.15,
 ) -> FrameAnalysisCache:
     from football_tracking.schema import DEFAULT_CLASS_CONF_THRESHOLDS
 
@@ -62,6 +63,7 @@ def create_frame_analysis_cache(
         "frame_count": frame_count,
         "fps": fps,
         "conf": conf,
+        "ball_conf": ball_conf,
         "device": device,
         "with_pitch": with_pitch,
         "pitch_conf": pitch_conf,
@@ -86,7 +88,7 @@ class FrameAnalysisCache:
         self.cache_key = cache_key
         self.expected_frame_count = expected_frame_count
         self.results: list[FrameResult] = []
-        self._pending_results: list[dict] = []
+        self._pending_results: list[FrameResult] = []
         self.hit = self._load()
 
     def _load(self) -> bool:
@@ -108,7 +110,8 @@ class FrameAnalysisCache:
             return False
 
     def record(self, result: FrameResult) -> None:
-        self._pending_results.append(_serialize_result(result))
+        self._pending_results.append(result)
+        self.results.append(result)
 
     def save(self) -> None:
         if len(self._pending_results) != self.expected_frame_count:
@@ -126,7 +129,7 @@ class FrameAnalysisCache:
                     {
                         "version": CACHE_VERSION,
                         "key": self.cache_key,
-                        "frames": self._pending_results,
+                        "frames": [_serialize_result(result) for result in self._pending_results],
                     },
                     cache_file,
                     protocol=pickle.HIGHEST_PROTOCOL,
@@ -151,6 +154,8 @@ def _serialize_result(result: FrameResult) -> dict:
         "player_mask": result.player_mask,
         "landmarks_xy": result.landmarks_xy,
         "pitch_xy": result.pitch_xy,
+        "projection_class_ids": result.projection_class_ids,
+        "pitch_transform": result.pitch_transform,
     }
 
 
@@ -168,4 +173,6 @@ def _restore_result(frame: dict) -> FrameResult:
         player_mask=frame["player_mask"],
         landmarks_xy=frame["landmarks_xy"],
         pitch_xy=frame["pitch_xy"],
+        projection_class_ids=frame["projection_class_ids"],
+        pitch_transform=frame.get("pitch_transform"),
     )

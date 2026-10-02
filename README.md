@@ -129,7 +129,7 @@ See all available options:
 python main.py --help
 ```
 
-Add `--interactive` to open the multiview review. In single-view mode, `--output PATH` sets the MP4 file path. In interactive mode, the multiview files go in that path's parent directory. You can set the detection confidence with `--conf 0.25`. Choose `--device cpu` or `--device 0` for CUDA. Run `python main.py --help` to see all CLI options.
+Add `--interactive` to open the multiview review. In single-view mode, `--output PATH` sets the MP4 file path. In interactive mode, the multiview files go in that path's parent directory. Set player confidence with `--conf 0.25` and ball confidence with `--ball-conf 0.15`. Choose `--device cpu` or `--device 0` for CUDA. Run `python main.py --help` to see all CLI options.
 
 The installed `football-track` command accepts the same options as `python main.py` and provides the same functionality:
 

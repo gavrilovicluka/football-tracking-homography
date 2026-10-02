@@ -5,6 +5,7 @@ from sports.annotators.soccer import draw_pitch, draw_points_on_pitch
 from sports.configs.soccer import SoccerPitchConfiguration
 
 from football_tracking.schema import BALL_CLASS_ID, CLASS_NAMES, GOALKEEPER_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID
+from football_tracking.tracking.ball import BallTrackPoint
 
 # Display palette indices: 0/1 = teams, then goalkeeper, referee, ball, unclassified player
 DISPLAY_COLORS = sv.ColorPalette.from_hex([
@@ -40,6 +41,8 @@ TILE_TITLES = {
     "projection": "2D Projection",
 }
 LABEL_HEIGHT = 24
+BALL_DETECTED_BGR = (0, 220, 0)
+BALL_INTERPOLATED_BGR = (0, 165, 255)
 
 
 def get_display_color_index(class_id: int, team_id: int) -> int:
@@ -78,10 +81,17 @@ def annotate_frame(
     detections: sv.Detections,
     team_ids: np.ndarray,
     annotators: tuple[sv.BoxAnnotator, sv.LabelAnnotator],
+    ball_track_point: BallTrackPoint | None = None,
+    tracked_ball: bool = False,
 ) -> np.ndarray:
     """
         Builds labels, picks team/class colors, and draws boxes and labels in one call.
     """
+    if tracked_ball:
+        non_ball_mask = detections.class_id != BALL_CLASS_ID
+        detections = detections[non_ball_mask]
+        team_ids = team_ids[non_ball_mask]
+
     box_annotator, label_annotator = annotators
     labels = make_labels(detections, team_ids)
 
@@ -99,7 +109,33 @@ def annotate_frame(
     )
 
     annotated = box_annotator.annotate(scene=frame.copy(), detections=display_detections)
-    return label_annotator.annotate(scene=annotated, detections=display_detections, labels=labels)
+    annotated = label_annotator.annotate(scene=annotated, detections=display_detections, labels=labels)
+    if tracked_ball:
+        return draw_ball_track_point(annotated, ball_track_point)
+    return annotated
+
+
+def draw_ball_track_point(
+    frame: np.ndarray, point: BallTrackPoint | None
+) -> np.ndarray:
+    if point is None:
+        return frame
+    color = BALL_INTERPOLATED_BGR if point.interpolated else BALL_DETECTED_BGR
+    center_x, center_y = point.center.astype(int)
+    cv2.circle(frame, (center_x, center_y), 7, color, -1, cv2.LINE_AA)
+    cv2.circle(frame, (center_x, center_y), 9, (0, 0, 0), 1, cv2.LINE_AA)
+    label = "ball (estimated)" if point.interpolated else f"ball {point.confidence:.2f}"
+    cv2.putText(
+        frame,
+        label,
+        (center_x + 9, center_y - 9),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.5,
+        color,
+        1,
+        cv2.LINE_AA,
+    )
+    return frame
 
 
 def draw_keypoints(frame: np.ndarray, landmark_xy: np.ndarray) -> np.ndarray:
@@ -117,20 +153,20 @@ def draw_projection(
     pitch_xy: np.ndarray | None,
     team_ids: np.ndarray | None,
     class_ids: np.ndarray | None = None,
+    ball_xy: np.ndarray | None = None,
 ) -> np.ndarray:
     """
         Draws a top-down pitch with players colored by team; pitch_xy is None when there is no homography.
     """
     pitch = draw_pitch(config)
-    if pitch_xy is None or team_ids is None or len(pitch_xy) == 0:
-        return pitch
+    if pitch_xy is not None and team_ids is not None and len(pitch_xy) > 0:
+        if class_ids is None:
+            class_ids = np.full(len(pitch_xy), PLAYER_CLASS_ID, dtype=int)
 
-    if class_ids is None:
-        class_ids = np.full(len(pitch_xy), PLAYER_CLASS_ID, dtype=int)
-
-    for team_id, color in TEAM_COLORS.items():
-        team_mask = (class_ids == PLAYER_CLASS_ID) & (team_ids == team_id)
-        if team_mask.any():
+        for team_id, color in TEAM_COLORS.items():
+            team_mask = (class_ids == PLAYER_CLASS_ID) & (team_ids == team_id)
+            if not team_mask.any():
+                continue
             pitch = draw_points_on_pitch(
                 config=config,
                 xy=pitch_xy[team_mask],
@@ -140,9 +176,10 @@ def draw_projection(
                 pitch=pitch,
             )
 
-    for class_id, color in PROJECTION_CLASS_COLORS.items():
-        class_mask = class_ids == class_id
-        if class_mask.any():
+        for class_id, color in PROJECTION_CLASS_COLORS.items():
+            class_mask = class_ids == class_id
+            if not class_mask.any():
+                continue
             pitch = draw_points_on_pitch(
                 config=config,
                 xy=pitch_xy[class_mask],
@@ -151,6 +188,15 @@ def draw_projection(
                 radius=8 if class_id == BALL_CLASS_ID else 10,
                 pitch=pitch,
             )
+    if ball_xy is not None:
+        pitch = draw_points_on_pitch(
+            config=config,
+            xy=np.asarray(ball_xy, dtype=np.float32).reshape(1, 2),
+            face_color=PROJECTION_CLASS_COLORS[BALL_CLASS_ID],
+            edge_color=sv.Color.BLACK,
+            radius=8,
+            pitch=pitch,
+        )
     return pitch
 
 

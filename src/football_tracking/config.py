@@ -6,7 +6,7 @@ MODELS_DIR = PROJECT_ROOT / "models"
 DOWNLOADS_DIR = PROJECT_ROOT / "downloads"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
-WEIGHTS_PATH = MODELS_DIR / "football_players_yolo26m_best.pt"
+WEIGHTS_PATH = MODELS_DIR / "football_players_yolo11m_best-1280.pt"
 PITCH_KEYPOINT_WEIGHTS_PATH = MODELS_DIR / "pitch_landmarks_yolo11m_best.pt"
 SIGLIP_MODEL_NAME = "google/siglip-base-patch16-224"
 
@@ -33,8 +33,8 @@ PLAYER_CROPS_SAMPLE_COUNT = 10  # number of player crops to sample across the cl
 
 BATCH_SIZE = 32  # batch size for embedding extraction
 
-# IMAGE_SIZE = 1280
-IMAGE_SIZE = 960
+IMAGE_SIZE = 1280
+# IMAGE_SIZE = 960
 PITCH_IMAGE_SIZE = IMAGE_SIZE
 PITCH_CONFIDENCE = 0.5
 PITCH_DETECT_INTERVAL = 1
@@ -42,3 +42,5 @@ PITCH_DETECT_INTERVAL = 1
 CLASSIFICATION_INTERVAL = 3
 
 LABEL_HEIGHT = 24
+
+MAX_INTERPOLATION_GAP = 25  # maximum gap for ball track interpolation

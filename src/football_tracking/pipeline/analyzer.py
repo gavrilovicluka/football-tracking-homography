@@ -9,22 +9,30 @@ from pathlib import Path
 from time import perf_counter
 from typing import Iterator
 
+import cv2
 import numpy as np
 import supervision as sv
 
 from football_tracking.config import (
     CLASSIFICATION_INTERVAL,
+    MAX_INTERPOLATION_GAP,
     PITCH_CONFIDENCE,
     PITCH_IMAGE_SIZE,
     PITCH_KEYPOINT_WEIGHTS_PATH,
     PLAYER_CROPS_SAMPLE_COUNT,
     WEIGHTS_PATH,
 )
-from football_tracking.schema import BALL_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID
+from football_tracking.schema import (
+    BALL_CLASS_ID,
+    DEFAULT_CLASS_CONF_THRESHOLDS,
+    PLAYER_CLASS_ID,
+    REFEREE_CLASS_ID,
+)
 from football_tracking.detection.players import FootballDetector
 from football_tracking.detection.pitch import PitchLandmarkDetector
 from football_tracking.geometry.projection import PitchProjector
 from football_tracking.teams.classifier import TeamClassifier, collect_fitting_crops, extract_crops, valid_box_mask
+from football_tracking.tracking.ball import BallCandidate, BallTrackPoint, BallTracker
 from football_tracking.tracking.tracker import PlayerTracker
 
 
@@ -36,6 +44,9 @@ class FrameResult:
     landmarks_xy: np.ndarray    # last detected pitch landmarks; empty when pitch analysis is off
     pitch_xy: np.ndarray | None  # pitch coordinates aligned with projection_class_ids
     projection_class_ids: np.ndarray
+    pitch_transform: np.ndarray | None = None
+    ball_track_point: BallTrackPoint | None = None
+    ball_pitch_xy: np.ndarray | None = None
 
 
 class StageTimer:
@@ -123,7 +134,7 @@ class FrameAnalyzer:
         # --------------------------
         projection_mask = np.isin(
             detections.class_id,
-            [BALL_CLASS_ID, PLAYER_CLASS_ID, REFEREE_CLASS_ID],
+            [PLAYER_CLASS_ID, REFEREE_CLASS_ID],
         )
         pitch_xy = None
         projection_class_ids = np.empty(0, dtype=int)
@@ -135,6 +146,10 @@ class FrameAnalyzer:
                 if pitch_xy is not None:
                     projection_class_ids = detections.class_id[projection_mask]
 
+        pitch_transform = None
+        if self.projector is not None and self.projector.transformer is not None:
+            pitch_transform = self.projector.transformer.m.copy()
+
         return FrameResult(
             detections=detections,
             team_ids=team_ids,
@@ -142,6 +157,7 @@ class FrameAnalyzer:
             landmarks_xy=self._last_landmark_xy,
             pitch_xy=pitch_xy,
             projection_class_ids=projection_class_ids,
+            pitch_transform=pitch_transform,
         )
 
     def _classify_teams(
@@ -181,28 +197,13 @@ class FrameAnalyzer:
         image_points = projected_detections.get_anchors_coordinates(
             anchor=sv.Position.BOTTOM_CENTER
         )
-        ball_mask = projected_detections.class_id == BALL_CLASS_ID
-        if ball_mask.any():
-            ball_boxes = projected_detections.xyxy[ball_mask]
-            image_points[ball_mask] = (ball_boxes[:, :2] + ball_boxes[:, 2:]) / 2
-
-        # return self.projector.transform_points(image_points)
-
-        # Get raw 2D coordinates on the pitch
         raw_pitch_xy = self.projector.transform_points(image_points)
 
-        # Time filtering (smoothing) of coordinates to prevent "jittering"
         tracker_ids = projected_detections.tracker_id
         smoothed_pitch_xy = raw_pitch_xy.copy()
 
         for i, tid in enumerate(tracker_ids):
-            is_ball = ball_mask[i] if i < len(ball_mask) else False
-
-            if is_ball:
-                # For the ball, we use a shorter window to avoid lagging behind fast movement
-                key = "ball"
-                max_len = 3
-            elif tid is not None and tid != -1:
+            if tid is not None and tid != -1:
                 # For players with a known ID, we use a longer window to smooth their positions over time
                 key = int(tid)
                 max_len = 6
@@ -221,10 +222,38 @@ class FrameAnalyzer:
         return smoothed_pitch_xy
 
 
+def track_ball_results(results: list[FrameResult]) -> None:
+    candidates_per_frame: list[list[BallCandidate]] = []
+    for result in results:
+        ball_mask = result.detections.class_id == BALL_CLASS_ID
+        ball_detections = result.detections[ball_mask]
+        confidence = ball_detections.confidence
+        if confidence is None:
+            candidates_per_frame.append([])
+            continue
+        candidates_per_frame.append([
+            BallCandidate(box.astype(float), float(score))
+            for box, score in zip(ball_detections.xyxy, confidence)
+        ])
+
+    ball_track = BallTracker(max_interpolation_gap=MAX_INTERPOLATION_GAP).track(
+        candidates_per_frame
+    )
+    for result, point in zip(results, ball_track):
+        result.ball_track_point = point
+        if point is None or result.pitch_transform is None:
+            continue
+        center = point.center.astype(np.float32).reshape(1, 1, 2)
+        result.ball_pitch_xy = cv2.perspectiveTransform(
+            center, result.pitch_transform
+        ).reshape(2)
+
+
 def create_analyzer(
     video_path: Path,
     fps: float,
     conf: float = 0.25,
+    ball_conf: float = 0.15,
     device: str = "cpu",
     with_pitch: bool = True ,
     with_classification: bool = False,
@@ -233,7 +262,17 @@ def create_analyzer(
     pitch_detect_interval: int = 1,
 ) -> FrameAnalyzer:
     """Loads the models and fits the team classifier (if enabled) on sample frames of the video."""
-    detector = FootballDetector(WEIGHTS_PATH, conf=conf, device=device)
+    class_conf_thresholds = DEFAULT_CLASS_CONF_THRESHOLDS.copy()
+    class_conf_thresholds[BALL_CLASS_ID] = ball_conf
+    for class_id in class_conf_thresholds:
+        if class_id != BALL_CLASS_ID:
+            class_conf_thresholds[class_id] = max(conf, class_conf_thresholds[class_id])
+    detector = FootballDetector(
+        WEIGHTS_PATH,
+        conf=min(conf, ball_conf),
+        device=device,
+        class_conf_thresholds=class_conf_thresholds,
+    )
     tracker = PlayerTracker(frame_rate=max(1, round(fps)))
 
     team_classifier = None
